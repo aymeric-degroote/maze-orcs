@@ -1,103 +1,65 @@
+"""
+Used this minigrid tutorial:
+https://minigrid.farama.org/content/create_env_tutorial/
+
+And integrated mazelib to generate the maze
+"""
 
 from __future__ import annotations
 # import gym-minigrid
 
+import numpy as np
+import matplotlib.pyplot as plt
 
+# minigrid: RL environment (+ UI)
 from minigrid.core.constants import COLOR_NAMES
 from minigrid.core.grid import Grid
 from minigrid.core.mission import MissionSpace
 from minigrid.core.world_object import Door, Goal, Key, Wall
 from minigrid.manual_control import ManualControl
 from minigrid.minigrid_env import MiniGridEnv
-import numpy as np
+
+# mazelib: generates mazes
 import mazelib
 from mazelib import Maze
 from mazelib.generate.Prims import Prims
-import matplotlib.pyplot as plt
 from mazelib.generate.BacktrackingGenerator import BacktrackingGenerator
 
 
+from environment import MazeEnv
+from policymaker import MazeGrid, Agent
 
-
-
-
-class MazeEnv(MiniGridEnv):
-    def __init__(
-        self,
-        size=31,
-        agent_start_pos=(np.random.randint(2,28), np.random.randint(2,28)),
-        agent_start_dir=0,
-        goal_pos=(np.random.randint(2,28), np.random.randint(2,28)),
-        max_steps: int | None = None,
-        **kwargs,
-    ):
-        self.agent_start_pos = agent_start_pos
-        self.agent_start_dir = agent_start_dir
-        self.goal_pos = goal_pos
-
-        mission_space = MissionSpace(mission_func=self._gen_mission)
-
-        if max_steps is None:
-            max_steps = 4 * size**2
-        super().__init__(
-            mission_space=mission_space,
-            grid_size=size,
-            # Set this to True for maximum speed
-            see_through_walls=True,
-            max_steps=max_steps,
-            **kwargs,
-        )
-
-    @staticmethod
-    def _gen_mission():
-        return "grand mission"
-
-    def _gen_grid(self, width, height):
-        # Create an empty grid
-        print(width,height)
-        self.grid = Grid(width, height)
-
-        m = Maze()
-        
-        
-        m.generator = Prims(15, 15)
-        m.start = (self.agent_start_pos[0], self.agent_start_pos[1])
-        m.end = (self.goal_pos[0], self.goal_pos[1])
-        m.generate()
-        gridded = m.grid
-        print(f'gridded: {gridded.shape}')
-        print(f'walls: {np.where(gridded == 1)},\
-              other: {np.asarray(np.where(gridded ==1)).T}')
-
-
-        for row in range(height):
-            for col in range(width):
-                if gridded[row, col] == 1:
-                    self.grid.set(row,col, Wall())
-
-        self.put_obj(Goal(), self.goal_pos[0], self.goal_pos[1])
-
-        # TODO: need error caused by agent spawning inside wall
-        if self.agent_start_pos is not None:
-            self.agent_pos = self.agent_start_pos
-            self.agent_dir = self.agent_start_dir
-        else:
-            self.place_agent()
-
-        self.mission = "grand mission"
-def showPNG(grid):
-    """Generate a simple image of the maze."""
-    plt.figure(figsize=(10, 5))
-    plt.imshow(grid, cmap=plt.cm.binary, interpolation='nearest')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
+from plot_functions import showPNG
 
 def main():
     env = MazeEnv(render_mode="human")
+    
+    num_episodes = 5
+    max_num_step = 1000
+    for ep_id in range(num_episodes):
+        observation, info = env.reset(seed=ep_id)
 
-    # enable manual control for testing
-    manual_control = ManualControl(env, seed=42)
-    manual_control.start()
+        agent = Agent(direction=env.agent_start_dir,
+                      size=env.size)
+
+        for i in range(max_num_step):
+            #print(observation.get('image')[:,:,0])
+            #input()
+            action = agent.policy(observation)  # User-defined policy function
+            observation, reward, terminated, truncated, info = env.step(action)
+            
+            # A reward of ‘1 - 0.9 * (step_count / max_steps)’ is given for success
+            # and ‘0’ for failure.
+            agent.rewards.append(reward)
+
+            if terminated or truncated:
+                break
+        
+        # enable manual control for testing
+        #manual_control = ManualControl(env, seed=42)
+        #manual_control.start()
+
+        #env.close()
 
     
 if __name__ == "__main__":
