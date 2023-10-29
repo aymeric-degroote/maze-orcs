@@ -23,6 +23,7 @@ from minigrid.minigrid_env import MiniGridEnv
 import mazelib
 from mazelib import Maze
 from mazelib.generate.Prims import Prims
+from mazelib.generate.DungeonRooms import DungeonRooms
 from mazelib.generate.BacktrackingGenerator import BacktrackingGenerator
 
 
@@ -34,9 +35,11 @@ class MazeEnv(MiniGridEnv):
         agent_start_dir=0,
         goal_pos=None,
         max_steps: int | None = None,
+        maze_type="dungeon",
         **kwargs,
     ):
         self.size = size
+        self.maze_type = maze_type
         if agent_start_pos is None:
             # odd coordinates are never walls so agent will not spawn inside a wall
             agent_start_pos = (1 + 2*np.random.randint(self.size//2), 
@@ -74,12 +77,20 @@ class MazeEnv(MiniGridEnv):
         # 15x15 for a 31x31 grid?
         # 31 = 15 empty cells + 16 walls, that's why!
         m = Maze()
-        m.generator = Prims(15, 15)
+        
+        if self.maze_type.lower() == "prims":
+            m.generator = Prims(self.size//2, self.size//2)
+        elif self.maze_type.lower() in ["dungeon", "dungeonrooms"]:
+            m.generator = DungeonRooms(self.size//2,self.size//2)
+        else:
+            print("Unknown maze type, generating using DungeonRooms")
+            m.generator = DungeonRooms(self.size//2,self.size//2)
+        
         m.start = (self.agent_start_pos[0], self.agent_start_pos[1])
         m.end = (self.goal_pos[0], self.goal_pos[1])
         m.generate()
         gridded = m.grid
-        print(f'gridded: {gridded.shape}')
+        #print(f'gridded: {gridded.shape}')
         #print(f'walls: {np.asarray(np.where(gridded == 1)).T[:10]}\n'
         #      f'other: {np.asarray(np.where(gridded != 1)).T[:10]}')
 

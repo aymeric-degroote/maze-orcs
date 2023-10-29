@@ -1,6 +1,6 @@
 # maze-orcs
 
-MARLEMN: Multi-agent RL for Efficient Maze Navigation
+Multi-agent RL for Efficient Maze Navigation
 
 
 ORCS 4529 - Reinforcement Learning
@@ -11,3 +11,10 @@ Aymeric Degroote
 Pedro Leandro La Rotta
 
 Instructor: Shipra Agrawal
+
+
+Way to go is by running:
+```
+python3 maze_gym.py
+```
+in the terminal.
