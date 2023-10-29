@@ -11,55 +11,51 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
-# minigrid: RL environment (+ UI)
-from minigrid.core.constants import COLOR_NAMES
-from minigrid.core.grid import Grid
-from minigrid.core.mission import MissionSpace
-from minigrid.core.world_object import Door, Goal, Key, Wall
-from minigrid.manual_control import ManualControl
-from minigrid.minigrid_env import MiniGridEnv
-
-# mazelib: generates mazes
-import mazelib
-from mazelib import Maze
-from mazelib.generate.Prims import Prims
-from mazelib.generate.BacktrackingGenerator import BacktrackingGenerator
-
-
 from environment import MazeEnv
 from policymaker import MazeGrid, Agent
 
-from plot_functions import showPNG
+from plot_functions import showPNG   # TODO: what is it for? can we remove it?
+
 
 def main():
-    env = MazeEnv(render_mode="human")
     
-    num_episodes = 5
+    num_episodes = 2
     max_num_step = 1000
+    
+    env = MazeEnv(render_mode="human", 
+                  maze_type="dungeon" #"prims"
+                 )
+    
     for ep_id in range(num_episodes):
         observation, info = env.reset(seed=ep_id)
 
-        agent = Agent(direction=env.agent_start_dir,
-                      size=env.size)
-
+        agent = Agent(size=env.size,
+                      #policy="greedy"
+                     )
+        
         for i in range(max_num_step):
-            #print(observation.get('image')[:,:,0])
-            #input()
-            action = agent.policy(observation)  # User-defined policy function
+            action = agent.policy(observation)
+            
             observation, reward, terminated, truncated, info = env.step(action)
             
-            # A reward of ‘1 - 0.9 * (step_count / max_steps)’ is given for success
-            # and ‘0’ for failure.
             agent.rewards.append(reward)
-
+            
+            # Reward system:
+            # success: ‘1 - 0.9 * (step_count / max_steps)’
+            # failure: ‘0’
+            
+            # TODO: use this tutorial for RL implementation using reward and NN
+            # https://gymnasium.farama.org/tutorials/training_agents/reinforce_invpend_gym_v26/#sphx-glr-tutorials-training-agents-reinforce-invpend-gym-v26-py
+            
             if terminated or truncated:
                 break
         
-        # enable manual control for testing
+        # TODO: delete the following comments if not needed
+        ## enable manual control for testing
         #manual_control = ManualControl(env, seed=42)
         #manual_control.start()
 
-        #env.close()
+    env.close()
 
     
 if __name__ == "__main__":

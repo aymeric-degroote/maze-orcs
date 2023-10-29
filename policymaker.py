@@ -29,8 +29,6 @@ class MazeGrid():
         https://github.com/mit-acl/gym-minigrid/blob/master/gym_minigrid/minigrid.py
         """
         observed_image = observation.get('image')[:,:,0]
-        #print("obs")
-        #print(observed_image)
         window = self.grid[self.center[0]-6:self.center[0]+1, 
                            self.center[1]-3:self.center[1]+4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
@@ -53,8 +51,13 @@ class MazeGrid():
 
 
 class Agent():
-    action_space = {0: "left"  ,   1: "right"   ,  2: "forward"}
-    def __init__(self, size, pos=None, direction=0):
+    
+    action_space = {0: "left",
+                    1: "right",
+                    2: "forward"}
+    
+    def __init__(self, size, pos=None, direction=0, policy=None,
+                verbose=False):
         if pos is None:
             pos = np.array([size//2, size//2])
         
@@ -62,10 +65,17 @@ class Agent():
         self.direction = direction # never used
         
         self.maze = MazeGrid(size)
-        self.maze.grid[self.pos[0], self.pos[1]] = self.maze.EMPTY
+        
+        self.default_policy = policy
+        self.verbose=verbose
         
         self.rewards = []
         self.actions_to_do = []
+        
+        self.policies = {"random": self.random_policy,
+                         "input":  self.input_policy,
+                         "greedy": self.greedy_bfs_policy,
+                         "left":   self.keep_on_left}
     
     def policy(self, observation):
         """
@@ -73,22 +83,28 @@ class Agent():
         """
         self.maze.update(observation)
         
-        #print(self.maze.grid)
         if self.actions_to_do:
             action = self.actions_to_do.pop()
         else:
-            action = self.greedy_bfs_policy()
-            #action = self.input_policy()
-            #action = self.random_policy()
+            if self.default_policy is not None:
+                action = self.policies[self.default_policy]()
+            else:
+                action = self.greedy_bfs_policy()
+                #action = self.keep_on_left()
+                #action = self.input_policy()
+                #action = self.random_policy()
         
         if action == 0:
             self.maze.left()
         elif action == 1:
             self.maze.right()
-        else:
+        elif action == 2:
             self.maze.forward()
+        else:
+            print(f"Unknown action: {action}")
         
-        print(self.action_space[action])
+        if self.verbose:
+            print(self.action_space[action])
         return action
     
     def random_policy(self):
@@ -105,36 +121,37 @@ class Agent():
             print("Wrong input. Options are: 0, 1 or 2")
             return self.input_policy()
     
-    def neighbors(self, cell):
-        neighs = []
-        cells = [(cell[0]-1, cell[1]),
-                  (cell[0]+1, cell[1]),
-                  (cell[0], cell[1]-1),
-                  (cell[0], cell[1]+1)]
-        actions = [[2], # forward
-                   [2,0,0], # left left forward
-                   [2,0], # right forward
-                   [2,1]  # left forward
-                   ]
-        # actions are written backwards 'cause we pop the list later
-        for c,a in zip(cells, actions):
-            if 0 <= c[0] < self.maze.size and \
-               0 <= c[1] < self.maze.size:
-                if self.maze.grid[c] != self.maze.WALL:
-                    neighs.append((c,a))
-        return neighs
-    
     def greedy_bfs_policy(self):
         """
         Not efficient at all because we run the algorithm every time
         """
+        
+        def neighbors(cell):
+            neighs = []
+            cells = [((cell[0]-1) % self.maze.size, cell[1]),
+                     ((cell[0]+1) % self.maze.size, cell[1]),
+                     (cell[0], (cell[1]-1) % self.maze.size),
+                     (cell[0], (cell[1]+1) % self.maze.size)]
+            actions = [[2],     # forward
+                       [2,0,0], # left left forward
+                       [2,0],   # left forward
+                       [2,1]    # right forward
+                       ]
+            # actions are written backwards because we use list.pop() later
+            for c,a in zip(cells, actions):
+                if 0 <= c[0] < self.maze.size and \
+                   0 <= c[1] < self.maze.size:
+                    if self.maze.grid[c] != self.maze.WALL:
+                        neighs.append((c,a))
+            return neighs
+        
         to_explore = [self.maze.center]
         previous_cell = {self.maze.center:(None,[])}
         target_found = False
         target = None
         while not target_found and to_explore:
             cell = to_explore.pop(0)
-            for c,a in self.neighbors(cell):
+            for c,a in neighbors(cell):
                 if c not in previous_cell:
                     previous_cell[c] = (cell, a)
                     to_explore.append(c)
@@ -145,10 +162,12 @@ class Agent():
                     break
         
         if target is None:
+            # TODO: I haven't been able to reproduce the bug but it happened before
             print("BFS couldn't find goal or unknown cell")
             print(self.maze.grid)
             print(previous_cell)
-            return 42 #np.random.randint(3)
+            return 42
+            #return np.random.randint(3)
         
         intermediate_cell, actions = previous_cell[target]
         while intermediate_cell != self.maze.center:
@@ -156,6 +175,34 @@ class Agent():
             intermediate_cell, actions = previous_cell[target]
         
         self.actions_to_do += actions
+        
+        return self.actions_to_do.pop()
+    
+    def keep_on_left(self):
+        
+        cell = self.maze.center
+        neighs = []
+        cells = [(cell[0], cell[1]-1),  # left
+                 (cell[0]-1, cell[1]),  # forward
+                 (cell[0], cell[1]+1),  # right
+                 (cell[0]+1, cell[1]),  # behind
+                  ]
+        actions = [[2,0],  # left forward
+                   [2], # forward
+                   [2,1], # right forward
+                   [2,1,1], # left left forward
+                   ]
+        # actions are written backwards because we use list.pop() later
+        for c,a in zip(cells, actions):
+            if 0 <= c[0] < self.maze.size and \
+               0 <= c[1] < self.maze.size:
+                if self.maze.grid[c] == self.maze.GOAL:
+                    neighs = [(c,a)]
+                    break
+                elif self.maze.grid[c] != self.maze.WALL:
+                    neighs.append((c,a))
+            
+        self.actions_to_do += neighs[0][1]
         
         return self.actions_to_do.pop()
         
