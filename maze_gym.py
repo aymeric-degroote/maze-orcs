@@ -1,8 +1,5 @@
 
 from __future__ import annotations
-# import gym-minigrid
-
-
 from minigrid.core.constants import COLOR_NAMES
 from minigrid.core.grid import Grid
 from minigrid.core.mission import MissionSpace
@@ -14,11 +11,6 @@ import mazelib
 from mazelib import Maze
 from mazelib.generate.Prims import Prims
 import matplotlib.pyplot as plt
-from mazelib.generate.BacktrackingGenerator import BacktrackingGenerator
-
-
-
-
 
 
 class MazeEnv(MiniGridEnv):
@@ -54,7 +46,6 @@ class MazeEnv(MiniGridEnv):
 
     def _gen_grid(self, width, height):
         # Create an empty grid
-        print(width,height)
         self.grid = Grid(width, height)
 
         m = Maze()
@@ -65,9 +56,6 @@ class MazeEnv(MiniGridEnv):
         m.end = (self.goal_pos[0], self.goal_pos[1])
         m.generate()
         gridded = m.grid
-        print(f'gridded: {gridded.shape}')
-        print(f'walls: {np.where(gridded == 1)},\
-              other: {np.asarray(np.where(gridded ==1)).T}')
 
 
         for row in range(height):
@@ -77,7 +65,7 @@ class MazeEnv(MiniGridEnv):
 
         self.put_obj(Goal(), self.goal_pos[0], self.goal_pos[1])
 
-        # TODO: need error caused by agent spawning inside wall
+        # TODO: fix error caused by agent spawning inside wall
         if self.agent_start_pos is not None:
             self.agent_pos = self.agent_start_pos
             self.agent_dir = self.agent_start_dir
