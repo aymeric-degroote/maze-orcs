@@ -13,6 +13,7 @@ from mazelib.generate.Prims import Prims
 import matplotlib.pyplot as plt
 
 
+
 class MazeEnv(MiniGridEnv):
     def __init__(
         self,
