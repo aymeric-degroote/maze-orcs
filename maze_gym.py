@@ -6,7 +6,6 @@ And integrated mazelib to generate the maze
 """
 
 from __future__ import annotations
-# import gym-minigrid
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,6 +16,7 @@ from policymaker import MazeGrid, Agent
 from plot_functions import showPNG   # TODO: what is it for? can we remove it?
 
 
+=======
 def main():
     
     num_episodes = 2
@@ -49,11 +49,7 @@ def main():
             
             if terminated or truncated:
                 break
-        
-        # TODO: delete the following comments if not needed
-        ## enable manual control for testing
-        #manual_control = ManualControl(env, seed=42)
-        #manual_control.start()
+
 
     env.close()
 
