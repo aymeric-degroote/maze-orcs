@@ -28,13 +28,11 @@ def main():
     
     observation, info = env.reset(seed=0)
     observation = observation.get('image')[:,:,0]
+    # TODO: either integrate [:,:,0] in reset function or use the whole image
+    # Doesn't really matter since we will switch to MiniWorld at some point
     
     obs_space_dims = observation.shape
     action_space_dims = 3
-    
-    print('obs dims')
-    print(obs_space_dims)
-    
     
     for ep_id in range(num_episodes):
         observation, info = env.reset(seed=ep_id)
@@ -42,7 +40,7 @@ def main():
         
         agent = Agent(obs_space_dims, action_space_dims,
                       size=env.size, load_maze=True
-                      #policy="greedy"
+                      policy="greedy"
                      )
         
         for i in range(max_num_step):
@@ -56,17 +54,9 @@ def main():
             # success: ‘1 - 0.9 * (step_count / max_steps)’
             # failure: ‘0’
             
-            # TODO: use this tutorial for RL implementation using reward and NN
-            # https://gymnasium.farama.org/tutorials/training_agents/reinforce_invpend_gym_v26/#sphx-glr-tutorials-training-agents-reinforce-invpend-gym-v26-py
-            
             if terminated or truncated:
                 break
-        
-        # TODO: delete the following comments if not needed
-        ## enable manual control for testing
-        #manual_control = ManualControl(env, seed=42)
-        #manual_control.start()
-
+    
     env.close()
 
     

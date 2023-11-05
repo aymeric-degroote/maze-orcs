@@ -9,6 +9,7 @@ Project - Fall 2023
 Team members:
 Aymeric Degroote
 Pedro Leandro La Rotta
+Kunal Kundu
 
 Instructor: Shipra Agrawal
 

@@ -6,7 +6,6 @@ And integrated mazelib to generate the maze
 """
 
 from __future__ import annotations
-# import gym-minigrid
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -72,9 +71,6 @@ class MazeEnv(MiniGridEnv):
             max_steps=max_steps,
             **kwargs,
         )
-    
-    #def get_observation_space_dims():
-    #    return 
 
     @staticmethod
     def _gen_mission():
@@ -114,7 +110,6 @@ class MazeEnv(MiniGridEnv):
             self.agent_dir = self.agent_start_dir
         else:
             # never run
-            print("Placing agent...")
             self.place_agent()
 
         self.mission = "grand mission"
