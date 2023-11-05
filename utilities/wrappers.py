@@ -1,5 +1,5 @@
 import gymnasium as gym
-from gym import spaces
+from gymnasium import spaces
 import cv2
 import numpy as np
 
