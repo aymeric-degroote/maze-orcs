@@ -26,10 +26,22 @@ def main():
                   maze_type="dungeon" #"prims"
                  )
     
+    observation, info = env.reset(seed=0)
+    observation = observation.get('image')[:,:,0]
+    
+    obs_space_dims = observation.shape
+    action_space_dims = 3
+    
+    print('obs dims')
+    print(obs_space_dims)
+    
+    
     for ep_id in range(num_episodes):
         observation, info = env.reset(seed=ep_id)
-
-        agent = Agent(size=env.size,
+        observation = observation.get('image')[:,:,0]
+        
+        agent = Agent(obs_space_dims, action_space_dims,
+                      size=env.size, load_maze=True
                       #policy="greedy"
                      )
         
@@ -37,7 +49,7 @@ def main():
             action = agent.policy(observation)
             
             observation, reward, terminated, truncated, info = env.step(action)
-            
+            observation = observation.get('image')[:,:,0]
             agent.rewards.append(reward)
             
             # Reward system:

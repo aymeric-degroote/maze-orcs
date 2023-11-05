@@ -28,6 +28,12 @@ from mazelib.generate.BacktrackingGenerator import BacktrackingGenerator
 
 
 class MazeEnv(MiniGridEnv):
+    """
+    Reward system:
+    - get to the goal: 1 - 0.9 * (step_count / max_steps)
+    - move to a cell never seen: 0.01
+    """
+    
     def __init__(
         self,
         size=31,
@@ -51,6 +57,8 @@ class MazeEnv(MiniGridEnv):
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
         self.goal_pos = goal_pos
+        
+        self.agent_pos_seen = set()
 
         mission_space = MissionSpace(mission_func=self._gen_mission)
 
@@ -64,6 +72,9 @@ class MazeEnv(MiniGridEnv):
             max_steps=max_steps,
             **kwargs,
         )
+    
+    #def get_observation_space_dims():
+    #    return 
 
     @staticmethod
     def _gen_mission():
@@ -72,7 +83,7 @@ class MazeEnv(MiniGridEnv):
     def _gen_grid(self, width, height):
         # Create an empty grid
         self.grid = Grid(width, height)
-        print('grid size:', width,height)
+        #print('grid size:', width,height)
         
         # 15x15 for a 31x31 grid?
         # 31 = 15 empty cells + 16 walls, that's why!
@@ -90,9 +101,6 @@ class MazeEnv(MiniGridEnv):
         m.end = (self.goal_pos[0], self.goal_pos[1])
         m.generate()
         gridded = m.grid
-        #print(f'gridded: {gridded.shape}')
-        #print(f'walls: {np.asarray(np.where(gridded == 1)).T[:10]}\n'
-        #      f'other: {np.asarray(np.where(gridded != 1)).T[:10]}')
 
         for row in range(height):
             for col in range(width):
@@ -110,3 +118,19 @@ class MazeEnv(MiniGridEnv):
             self.place_agent()
 
         self.mission = "grand mission"
+    
+    def step(self, *args, **kwargs):
+        observation, reward, terminated, truncated, info = super().step(*args, **kwargs) 
+        
+        if self.agent_pos not in self.agent_pos_seen:
+            reward += 0.01
+            self.agent_pos_seen.add(self.agent_pos)
+        
+        return observation, reward, terminated, truncated, info
+    
+    def reset(self, *args, **kwargs):
+        output = super().reset(*args, **kwargs) 
+        
+        self.agent_pos_seen = set()
+        
+        return output
