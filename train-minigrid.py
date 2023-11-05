@@ -26,7 +26,7 @@ def main():
     
     num_episodes = 1000
     max_num_step = 50
-    step_print = 50
+    step_print = 100
     
     env = MazeEnv(#render_mode="human", 
                   maze_type="prims" # "dungeon"
@@ -65,7 +65,7 @@ def main():
                 observation = observation.get('image')[:,:,0]
                 
                 agent.rewards.append(reward)
-                ep_reward 
+                ep_reward += reward
 
                 if terminated or truncated:
                     break
