@@ -17,13 +17,25 @@ from utilities.memory import ReplayBuffer
 import torch
 
 env = gym.make("MiniWorld-Maze-v0", 
-               num_rows=10, 
-               num_cols=10, 
-               room_size=5, 
-               render_mode='human',
+               num_rows=3, 
+               num_cols=3, 
+               room_size=2, 
+               render_mode='top',
                view='top')
+# env.reset()
+# initial_action = env.action_space.sample()
+# print(f'action space: {env.action_space}')
+# print(f'obs space: {env.observation_space}')
+# print(f'random act: {initial_action}')
 
-env = WarpFrame(env) # RGB to Grayscale
+# obs, _, _, _, _ = env.step(initial_action)
+# print(obs.shape, type(obs))
+
+# img = Image.fromarray(obs.squeeze(), mode="L")
+# img.save('my.png')
+# img.show()
+# raise ValueError
+# env = WarpFrame(env) # RGB to Grayscale
 env = PyTorchFrame(env)
 print("initialized environment...")
 
@@ -44,14 +56,14 @@ print("initialized dqn agent...")
 
 
 eps_timesteps = 0.1* \
-    int(1e6)
+    int(100000)
 episode_rewards = [0.0]
 
 state, _ = env.reset()
 
 
-for t in range(1):
-    print(f'training episode step {t}')
+for t in range(100000):
+    print(f'training episode step {t}, rewards: {episode_rewards}')
     fraction = min(1.0, float(t) / eps_timesteps)
     eps_threshold = 1 + fraction * \
         (0.01 - 1)
@@ -64,13 +76,13 @@ for t in range(1):
         # Explore
         action = env.action_space.sample()
 
-    next_state, reward, done, info = env.step(action)
+    next_state, reward, done, truncated, info = env.step(action)
     agent.memory.add(state, action, reward, next_state, float(done))
     state = next_state
 
     episode_rewards[-1] += reward
     if done:
-        state = env.reset()
+        state,_ = env.reset()
         episode_rewards.append(0.0)
 
     if t > 1000 and t % 1 == 0:
@@ -95,17 +107,6 @@ for t in range(1):
 
 
 
-# initial_action = env.action_space.sample()
-# print(f'action space: {env.action_space}')
-# print(f'obs space: {env.observation_space}')
-# print(f'random act: {initial_action}')
-
-# obs, _, _, _, _ = env.step(initial_action)
-# print(obs.shape, type(obs))
-
-# img = Image.fromarray(obs.squeeze(), mode="L")
-# img.save('my.png')
-# img.show()
 
 
 

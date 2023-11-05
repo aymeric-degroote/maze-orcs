@@ -1,4 +1,4 @@
-from gym import spaces
+from gymnasium import spaces
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -18,13 +18,6 @@ class DQN(nn.Module):
         :param action_space: the action space of the environment
         """
         super().__init__()
-        assert type(
-            observation_space) == spaces.Box, 'observation_space must be of type Box'
-        assert len(
-            observation_space.shape) == 3, 'observation space must have the form channels x width x height'
-        assert type(
-            action_space) == spaces.Discrete, 'action_space must be of type Discrete'
-        
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=observation_space.shape[0], out_channels=32, kernel_size=8, stride=4),
             nn.ReLU(),
@@ -35,7 +28,7 @@ class DQN(nn.Module):
         )
 
         self.fc = nn.Sequential(
-            nn.Linear(in_features=64*7*7 , out_features=512),
+            nn.Linear(in_features=64*6*4 , out_features=512),
             nn.ReLU(),
             nn.Linear(in_features=512, out_features=action_space.n)
         )

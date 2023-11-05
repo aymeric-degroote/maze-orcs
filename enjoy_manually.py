@@ -10,9 +10,9 @@ from utilities.manual_control import ManualControl
 
 ENVIRONMENT_NAME = "MiniWorld-Maze-v0" #change to whatever miniworld environment you want to manually play with
 env = gym.make(ENVIRONMENT_NAME, 
-               num_rows=10, 
-               num_cols=10, 
-               room_size=5, 
+               num_rows=3, 
+               num_cols=3, 
+               room_size=2, 
                render_mode='human',
                view='top')
 env.reset()

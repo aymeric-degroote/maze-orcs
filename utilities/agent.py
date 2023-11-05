@@ -1,5 +1,5 @@
 # Inspired from https://github.com/KaleabTessera/DQN-Atari/
-from gym import spaces
+from gymnasium import spaces
 import numpy as np
 
 from utilities.dqn_atari_model import DQN
