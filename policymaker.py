@@ -66,12 +66,11 @@ class Policy_Network(nn.Module):
         """
         super().__init__()
 
-        hidden_space1 = 64  # Nothing special with 16, feel free to change
-        hidden_space2 = 32  # Nothing special with 32, feel free to change
-        
+        hidden_space1 = 64
+        hidden_space2 = 32
 
         # Create Network
-        # TODO: use 2DConv (observation is an image!!)
+        # TODO: make a real NN, not this thing
         self.net = nn.Sequential(
             #nn.Conv2d(1,20,5),
             #nn.ReLU(),
@@ -191,11 +190,15 @@ class Agent():
         Returns:
             action: Action to be performed
         """
-        image = np.array([state == i for i in [0,1,2,8]], dtype=float)
+        objects = [UNKNOWN, EMPTY, WALL, GOAL]
+        image = np.array([state == i for i in objects], dtype=float)
+        
         image = torch.tensor(np.array([image]))
         
         # returns probability of taking each action
-        distrib = self.net(image).squeeze()   # squeeze wors if batch of 1!!! 
+        distrib = self.net(image).squeeze()   
+        # use squeeze() only if batch of 1
+        # TODO: do we always have a batch of 1?
         
         action = distrib.multinomial(num_samples=1)
         action = action.numpy()
