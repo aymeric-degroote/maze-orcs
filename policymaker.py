@@ -190,7 +190,9 @@ class Agent():
         Returns:
             action: Action to be performed
         """
-        objects = [UNKNOWN, EMPTY, WALL, GOAL]
+        objects = [self.maze.UNKNOWN, self.maze.EMPTY, 
+                   self.maze.WALL, self.maze.GOAL]
+        
         image = np.array([state == i for i in objects], dtype=float)
         
         image = torch.tensor(np.array([image]))
