@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
 
 
 class MazeGrid():
@@ -28,7 +32,7 @@ class MazeGrid():
         all values can be find at:
         https://github.com/mit-acl/gym-minigrid/blob/master/gym_minigrid/minigrid.py
         """
-        observed_image = observation.get('image')[:,:,0]
+        observed_image = observation #.get('image')[:,:,0]
         window = self.grid[self.center[0]-6:self.center[0]+1, 
                            self.center[1]-3:self.center[1]+4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
@@ -50,33 +54,103 @@ class MazeGrid():
         self.grid = np.rot90(self.grid, 1)
 
 
+class Policy_Network(nn.Module):
+    """Parametrized Policy Network."""
+
+    def __init__(self, obs_space_dims, action_space_dims: int):
+        """Initializes a neural network that estimates the distribution from which an action is sampled from.
+
+        Args:
+            obs_space_dims: Dimension of the observation space
+            action_space_dims: Dimension of the action space
+        """
+        super().__init__()
+
+        hidden_space1 = 64  # Nothing special with 16, feel free to change
+        hidden_space2 = 32  # Nothing special with 32, feel free to change
+        
+
+        # Create Network
+        # TODO: use 2DConv (observation is an image!!)
+        self.net = nn.Sequential(
+            #nn.Conv2d(1,20,5),
+            #nn.ReLU(),
+            #nn.Conv2d(20,64,5),
+            #nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(np.prod(obs_space_dims)*4, hidden_space1),
+            nn.Tanh(),
+            nn.Linear(hidden_space1, hidden_space2),
+            nn.Tanh(),
+            nn.Linear(hidden_space2, action_space_dims),
+            nn.Softmax()
+        )
+
+    def forward(self, observation: torch.Tensor) -> torch.Tensor:
+        """Conditioned on the observation, returns the distribution from which an action is sampled from.
+
+        Args:
+            x: Observation from the environment
+
+        Returns:
+            action_distribution: predicted distribution of action to take
+        """
+        action_distribution = self.net(observation.float())   # TODO: remove x.float?
+
+        return action_distribution
+
+
 class Agent():
     
     action_space = {0: "left",
                     1: "right",
                     2: "forward"}
     
-    def __init__(self, size, pos=None, direction=0, policy=None,
-                verbose=False):
+    def __init__(self, obs_space_dims, action_space_dims,
+                      size, pos=None, direction=0, policy=None,
+                verbose=False, load_maze=False, training=False):
         if pos is None:
             pos = np.array([size//2, size//2])
         
         self.pos = pos # never used
         self.direction = direction # never used
         
+        self.policies = {"random": self.random_policy}
+        
         self.maze = MazeGrid(size)
         
+        if load_maze:
+            self.policies["input"] =  self.input_policy
+            self.policies["greedy"] = self.greedy_bfs_policy
+            self.policies["left"] = self.keep_on_left
+        
+        if training:
+            # Hyperparameters
+            self.learning_rate = 1e-4  # Learning rate for policy optimization
+            self.gamma = 0.99  # Discount factor
+            self.eps = 1e-6  # small number for mathematical stability
+
+            self.probs = []  # Stores probability values of the sampled action
+            self.rewards = []  # Stores the corresponding rewards
+
+            self.net = Policy_Network(obs_space_dims, action_space_dims)
+            self.optimizer = torch.optim.AdamW(self.net.parameters(), 
+                                               lr=self.learning_rate)
+    
+            self.policies["network"] = self.network_policy
+            
+        if policy is not None and policy not in self.policies.keys():
+            policy = None
+            print(f"policy invalid, using another one instead")
+        
         self.default_policy = policy
+        
         self.verbose=verbose
         
         self.rewards = []
         self.actions_to_do = []
         
-        self.policies = {"random": self.random_policy,
-                         "input":  self.input_policy,
-                         "greedy": self.greedy_bfs_policy,
-                         "left":   self.keep_on_left}
-    
+        
     def policy(self, observation):
         """
         0: left     1: right     2: forward
@@ -87,9 +161,10 @@ class Agent():
             action = self.actions_to_do.pop()
         else:
             if self.default_policy is not None:
-                action = self.policies[self.default_policy]()
+                action = self.policies[self.default_policy](observation)
             else:
-                action = self.greedy_bfs_policy()
+                action = self.network_policy(observation)
+                #action = self.greedy_bfs_policy()
                 #action = self.keep_on_left()
                 #action = self.input_policy()
                 #action = self.random_policy()
@@ -107,13 +182,63 @@ class Agent():
             print(self.action_space[action])
         return action
     
-    def random_policy(self):
+    def network_policy(self, state: np.ndarray) -> int:
+        """Returns an action, conditioned on the policy and observation.
+        
+        Args:
+            state: Observation from the environment
+
+        Returns:
+            action: Action to be performed
+        """
+        image = np.array([state == i for i in [0,1,2,8]], dtype=float)
+        image = torch.tensor(np.array([image]))
+        
+        # returns probability of taking each action
+        distrib = self.net(image).squeeze()   # squeeze wors if batch of 1!!! 
+        
+        action = distrib.multinomial(num_samples=1)
+        action = action.numpy()
+        
+        prob = distrib[action]
+
+        self.probs.append(prob)
+
+        return int(action)
+    
+    def update(self):
+        """Updates the policy network's weights."""
+        running_g = 0
+        gs = []
+
+        # Discounted return (backwards) - [::-1] will return an array in reverse
+        for R in self.rewards[::-1]:
+            running_g = R + self.gamma * running_g
+            gs.insert(0, running_g)
+
+        deltas = torch.tensor(gs)
+
+        loss = 0
+        # minimize -1 * prob * reward obtained
+        for log_prob, delta in zip(self.probs, deltas):
+            loss += log_prob.mean() * delta * (-1)
+
+        # Update the policy network
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        # Empty / zero out all episode-centric/related variables
+        self.probs = []
+        self.rewards = []
+    
+    def random_policy(self, observation=None):
         if self.maze.can_move_forward():
             return np.random.randint(3)
         else:
             return np.random.randint(2)
     
-    def input_policy(self):
+    def input_policy(self, observation=None):
         a = input("Action? ")
         if a in "012":
             return int(a)
@@ -121,7 +246,7 @@ class Agent():
             print("Wrong input. Options are: 0, 1 or 2")
             return self.input_policy()
     
-    def greedy_bfs_policy(self):
+    def greedy_bfs_policy(self, observation=None):
         """
         Not efficient at all because we run the algorithm every time
         """
@@ -178,7 +303,7 @@ class Agent():
         
         return self.actions_to_do.pop()
     
-    def keep_on_left(self):
+    def keep_on_left(self, observation=None):
         
         cell = self.maze.center
         neighs = []
