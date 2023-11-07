@@ -13,6 +13,7 @@ from collections import deque
 from utilities.wrappers import WarpFrame, PyTorchFrame
 from utilities.agent import DQNAgent
 from utilities.memory import ReplayBuffer
+from tqdm import tqdm
 
 import torch
 
@@ -22,20 +23,7 @@ env = gym.make("MiniWorld-Maze-v0",
                room_size=2, 
                render_mode='top',
                view='top')
-# env.reset()
-# initial_action = env.action_space.sample()
-# print(f'action space: {env.action_space}')
-# print(f'obs space: {env.observation_space}')
-# print(f'random act: {initial_action}')
 
-# obs, _, _, _, _ = env.step(initial_action)
-# print(obs.shape, type(obs))
-
-# img = Image.fromarray(obs.squeeze(), mode="L")
-# img.save('my.png')
-# img.show()
-# raise ValueError
-# env = WarpFrame(env) # RGB to Grayscale
 env = PyTorchFrame(env)
 print("initialized environment...")
 
@@ -56,14 +44,15 @@ print("initialized dqn agent...")
 
 
 eps_timesteps = 0.1* \
-    int(100000)
+    int(500000)
 episode_rewards = [0.0]
 
 state, _ = env.reset()
 
 
-for t in range(100000):
-    print(f'training episode step {t}, rewards: {episode_rewards}')
+for t in tqdm(range(500000)):
+    if t % 250 == 0:
+        print(f'training episode step {t}, rewards: {episode_rewards}')
     fraction = min(1.0, float(t) / eps_timesteps)
     eps_threshold = 1 + fraction * \
         (0.01 - 1)
@@ -92,6 +81,10 @@ for t in range(100000):
         agent.update_target_network()
 
     num_episodes = len(episode_rewards)
+
+torch.save(agent.policy_network.state_dict(), f'checkpoint2.pth')
+np.savetxt('rewards_per_episode2.csv', episode_rewards,
+            delimiter=',', fmt='%1.3f')
 
 
 
