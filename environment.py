@@ -41,23 +41,20 @@ class MazeEnv(MiniGridEnv):
         goal_pos=None,
         max_steps: int | None = None,
         maze_type="dungeon",
+        reward_new_cell=0.0,
         **kwargs,
     ):
         self.size = size
         self.maze_type = maze_type
-        if agent_start_pos is None:
-            # odd coordinates are never walls so agent will not spawn inside a wall
-            agent_start_pos = (1 + 2*np.random.randint(self.size//2), 
-                               1 + 2*np.random.randint(self.size//2))
-        if goal_pos is None:
-            goal_pos = (np.random.randint(2,self.size-2), 
-                        np.random.randint(2,self.size-2))
         
-        self.agent_start_pos = agent_start_pos
+        #self.agent_start_pos = agent_start_pos
+        #self.goal_pos = goal_pos
         self.agent_start_dir = agent_start_dir
-        self.goal_pos = goal_pos
+        self._gen_positions()
         
-        self.agent_pos_seen = set()
+        
+        self.total_reward = 0
+        self.reward_new_cell = reward_new_cell
 
         mission_space = MissionSpace(mission_func=self._gen_mission)
 
@@ -75,14 +72,18 @@ class MazeEnv(MiniGridEnv):
     @staticmethod
     def _gen_mission():
         return "grand mission"
-
+    
+    def _gen_positions(self):
+        self.agent_start_pos = (1 + 2*np.random.randint(self.size//2), 
+                                1 + 2*np.random.randint(self.size//2))
+        self.goal_pos = (np.random.randint(2,self.size-2), 
+                         np.random.randint(2,self.size-2))
+        self.agent_pos_seen = set([self.agent_start_pos])
+        
     def _gen_grid(self, width, height):
         # Create an empty grid
         self.grid = Grid(width, height)
-        #print('grid size:', width,height)
         
-        # 15x15 for a 31x31 grid?
-        # 31 = 15 empty cells + 16 walls, that's why!
         m = Maze()
         
         if self.maze_type.lower() == "prims":
@@ -102,15 +103,10 @@ class MazeEnv(MiniGridEnv):
             for col in range(width):
                 if gridded[row, col] == 1:
                     self.grid.set(row,col, Wall())
-
-        self.put_obj(Goal(), self.goal_pos[0], self.goal_pos[1])
         
-        if self.agent_start_pos is not None:
-            self.agent_pos = self.agent_start_pos
-            self.agent_dir = self.agent_start_dir
-        else:
-            # never run
-            self.place_agent()
+        self.put_obj(Goal(), self.goal_pos[0], self.goal_pos[1])
+        self.agent_pos = self.agent_start_pos
+        self.agent_dir = self.agent_start_dir
 
         self.mission = "grand mission"
     
@@ -118,14 +114,24 @@ class MazeEnv(MiniGridEnv):
         observation, reward, terminated, truncated, info = super().step(*args, **kwargs) 
         
         if self.agent_pos not in self.agent_pos_seen:
-            reward += 0.01
+            reward += self.reward_new_cell
             self.agent_pos_seen.add(self.agent_pos)
         
+        self.total_reward += reward
         return observation, reward, terminated, truncated, info
     
     def reset(self, *args, **kwargs):
         output = super().reset(*args, **kwargs) 
         
-        self.agent_pos_seen = set()
+        self._gen_positions()
+        
+        self.total_reward = 0
         
         return output
+    
+    def get_stats(self):
+        
+        return self.total_reward, self.agent_pos_seen
+        
+        
+        

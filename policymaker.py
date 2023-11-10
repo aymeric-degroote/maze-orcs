@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -66,8 +67,8 @@ class Policy_Network(nn.Module):
         """
         super().__init__()
 
-        hidden_space1 = 64
-        hidden_space2 = 32
+        hidden_space1 = 16
+        hidden_space2 = 16
 
         # Create Network
         # TODO: make a real NN, not this thing
@@ -77,12 +78,12 @@ class Policy_Network(nn.Module):
             #nn.Conv2d(20,64,5),
             #nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(np.prod(obs_space_dims)*4, hidden_space1),
+            nn.Linear(obs_space_dims*4, hidden_space1),
             nn.Tanh(),
             nn.Linear(hidden_space1, hidden_space2),
             nn.Tanh(),
             nn.Linear(hidden_space2, action_space_dims),
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
@@ -106,8 +107,10 @@ class Agent():
                     2: "forward"}
     
     def __init__(self, obs_space_dims, action_space_dims,
-                      size, pos=None, direction=0, policy=None,
-                verbose=False, load_maze=False, training=False):
+                size, pos=None, direction=0, policy=None,
+                verbose=False, load_maze=False, training=False,
+                load_weights=None, network=True, path='.',
+                learning_rate = 1e-4):
         if pos is None:
             pos = np.array([size//2, size//2])
         
@@ -123,19 +126,32 @@ class Agent():
             self.policies["greedy"] = self.greedy_bfs_policy
             self.policies["left"] = self.keep_on_left
         
-        if training:
+        
+        if network:
             # Hyperparameters
-            self.learning_rate = 1e-4  # Learning rate for policy optimization
-            self.gamma = 0.99  # Discount factor
+            self.learning_rate = learning_rate  # Learning rate for policy optimization
+            self.gamma = 0.95  # Discount factor
             self.eps = 1e-6  # small number for mathematical stability
 
             self.probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
             self.net = Policy_Network(obs_space_dims, action_space_dims)
+
+            if load_weights:
+                fn = os.path.join(path, "weights", load_weights)
+                self.net.load_state_dict(torch.load(fn))
+                print("Loaded model weights from", fn)
+
+                if training:
+                    self.net.train()
+                else:
+                    # TODO: print a warning?
+                    print("Warning: eval mode")
+                    self.net.eval()
             self.optimizer = torch.optim.AdamW(self.net.parameters(), 
                                                lr=self.learning_rate)
-    
+
             self.policies["network"] = self.network_policy
             
         if policy is not None and policy not in self.policies.keys():
@@ -181,7 +197,7 @@ class Agent():
             print(self.action_space[action])
         return action
     
-    def network_policy(self, state: np.ndarray) -> int:
+    def network_policy(self, state: np.ndarray, get_dist=False) -> int:
         """Returns an action, conditioned on the policy and observation.
         
         Args:
@@ -193,21 +209,23 @@ class Agent():
         objects = [self.maze.UNKNOWN, self.maze.EMPTY, 
                    self.maze.WALL, self.maze.GOAL]
         
-        image = np.array([state == i for i in objects], dtype=float)
+        image = np.array([[state == i for i in objects]], dtype=float)
         
-        image = torch.tensor(np.array([image]))
+        image = torch.tensor(image)
         
         # returns probability of taking each action
-        distrib = self.net(image).squeeze()   
+        distrib = self.net(image).squeeze()
         # use squeeze() only if batch of 1
         # TODO: do we always have a batch of 1?
+        
+        if get_dist:
+            return distrib.detach().numpy()
         
         action = distrib.multinomial(num_samples=1)
         action = action.numpy()
         
-        prob = distrib[action]
-
-        self.probs.append(prob)
+        log_prob = torch.log(distrib[action])
+        self.probs.append(log_prob)
 
         return int(action)
     
@@ -236,6 +254,11 @@ class Agent():
         # Empty / zero out all episode-centric/related variables
         self.probs = []
         self.rewards = []
+    
+    def save_weights(self, weights_fn, path="."):
+        fn = os.path.join(path, "weights", weights_fn)
+        torch.save(self.net.state_dict(), fn)
+        return fn
     
     def random_policy(self, observation=None):
         if self.maze.can_move_forward():
