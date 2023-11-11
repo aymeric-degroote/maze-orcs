@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
 
-class MazeGrid():
+class MazeGrid:
     UNKNOWN = 0
     EMPTY = 1
     WALL = 2
@@ -35,11 +34,11 @@ class MazeGrid():
         """
         observed_image = observation  # .get('image')[:,:,0]
         window = self.grid[self.center[0] - 6:self.center[0] + 1,
-                 self.center[1] - 3:self.center[1] + 4] * 1  # copy
+                           self.center[1] - 3:self.center[1] + 4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
 
         self.grid[self.center[0] - 6:self.center[0] + 1,
-        self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
+                  self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
 
     def can_move_forward(self):
         return self.grid[self.center[0] - 1, self.center[1]] == self.EMPTY
@@ -55,7 +54,7 @@ class MazeGrid():
         self.grid = np.rot90(self.grid, 1)
 
 
-class Policy_Network(nn.Module):
+class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
     def __init__(self, obs_space_dims, action_space_dims: int):
@@ -90,7 +89,7 @@ class Policy_Network(nn.Module):
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
 
         Args:
-            x: Observation from the environment
+            observation: Observation from the environment
 
         Returns:
             action_distribution: predicted distribution of action to take
@@ -100,7 +99,7 @@ class Policy_Network(nn.Module):
         return action_distribution
 
 
-class Agent():
+class Agent:
     action_space = {0: "left",
                     1: "right",
                     2: "forward"}
@@ -138,10 +137,10 @@ class Agent():
             self.gamma = 0.95  # Discount factor
             self.eps = 1e-6  # small number for mathematical stability
 
-            self.probs = []  # Stores probability values of the sampled action
+            self.log_probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
-            self.net = Policy_Network(obs_space_dims, action_space_dims)
+            self.net = PolicyNetwork(obs_space_dims, action_space_dims)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -209,6 +208,7 @@ class Agent():
         
         Args:
             state: Observation from the environment
+            get_dist: if True, returns the distribution instead of sampling from it
 
         Returns:
             action: Action to be performed
@@ -232,7 +232,7 @@ class Agent():
         action = action.numpy()
 
         log_prob = torch.log(distrib[action])
-        self.probs.append(log_prob)
+        self.log_probs.append(log_prob)
 
         return int(action)
 
@@ -250,7 +250,7 @@ class Agent():
 
         loss = 0
         # minimize -1 * prob * reward obtained
-        for log_prob, delta in zip(self.probs, deltas):
+        for log_prob, delta in zip(self.log_probs, deltas):
             loss += log_prob.mean() * delta * (-1)
 
         # Update the policy network
@@ -259,7 +259,7 @@ class Agent():
         self.optimizer.step()
 
         # Empty / zero out all episode-centric/related variables
-        self.probs = []
+        self.log_probs = []
         self.rewards = []
 
     def save_weights(self, weights_fn, path="."):

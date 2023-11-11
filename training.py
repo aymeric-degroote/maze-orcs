@@ -13,7 +13,7 @@ def initialize_training(obs_space_dims,
                         reward_new_cell=None,
                         maze_type=None,
                         **kwargs):
-    # TODO: not sure if it is good pratice to pay around with kwargs
+    # TODO: not sure if it is good practice to play around with kwargs
     if learning_rate is not None:
         kwargs["learning_rate"] = learning_rate
 
@@ -35,6 +35,7 @@ def initialize_training(obs_space_dims,
                   **kwargs)
 
     return agent, env
+
 
 def train_agnostic_agent(agent, env, method,
                          num_episodes,
@@ -68,13 +69,13 @@ def train_agnostic_agent(agent, env, method,
     else:
         raise NameError(f"method '{method}' unknown")
 
-def fine_tune_agent(agent, env, maze_seed,
-                     num_episodes,
-                     max_num_step,
-                     step_print=None,
-                     save_weights_fn=None
-                     ):
 
+def fine_tune_agent(agent, env, maze_seed,
+                    num_episodes,
+                    max_num_step,
+                    step_print=None,
+                    save_weights_fn=None
+                    ):
     env.reset(maze_seed=maze_seed)
 
     return run_agent(agent, env, num_episodes, max_num_step,
@@ -109,9 +110,11 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
     assert training == agent.training, f"Agent is in {'training' if agent.training else 'eval'} mode " \
                                        f"but you are running in {'training' if training else 'eval'} mode"
 
-    nb_cells_seen_over_episodes = []
-    nb_actions_over_episodes = []
-    reward_over_episodes = []
+    stats = {
+        "reward_over_episodes": [],
+        "nb_cells_seen": [],
+        "nb_actions": [],
+    }
 
     for ep_id in range(num_episodes):
         if change_maze_at_each_episode:
@@ -121,32 +124,24 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
 
         ep_reward = run_episode(agent, env, max_num_step)
 
-        reward_over_episodes.append(ep_reward)
+        stats["reward_over_episodes"].append(ep_reward)
         if training:
             if batch_size is None or (ep_id + 1) % batch_size == 0:
                 agent.update()
 
         _, agent_pos_seen, nb_actions = env.get_stats()
         nb_cells_seen = len(agent_pos_seen)
-        nb_cells_seen_over_episodes.append(nb_cells_seen)
-        nb_actions_over_episodes.append(nb_actions)
+        stats["nb_cells_seen_over_episodes"].append(nb_cells_seen)
+        stats["nb_actions_over_episodes"].append(nb_actions)
 
         if step_print and (ep_id + 1) % step_print == 0:
             print(f"Episode {str(ep_id + 1).rjust(3)} "
-                  f"| Average Reward {np.mean(reward_over_episodes[-step_print:]):.4f} "
-                  f"| Cells seen {np.mean(nb_cells_seen_over_episodes[-step_print:])} "
-                  f"| Number of steps {np.mean(nb_actions_over_episodes[-step_print:])}")
+                  f"| Average Reward {np.mean(stats['reward_over_episodes'][-step_print:]):.4f} "
+                  f"| Cells seen {np.mean(stats['nb_cells_seen_over_episodes'][-step_print:])} "
+                  f"| Number of steps {np.mean(stats['nb_actions_over_episodes'][-step_print:])}")
 
             if training and save_weights_fn:
                 fn = agent.save_weights(save_weights_fn)
                 print("saved model weights in", fn)
 
-    # TODO: we might as well have the dictionary before the loop
-    stats = {
-        "reward_over_episodes": reward_over_episodes,
-        "nb_cells_seen": nb_cells_seen_over_episodes,
-        "nb_actions": nb_actions_over_episodes,
-    }
     return stats
-
-
