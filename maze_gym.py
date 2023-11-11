@@ -3,17 +3,14 @@ Used this minigrid tutorial:
 https://minigrid.farama.org/content/create_env_tutorial/
 
 And integrated mazelib to generate the maze
+
+TODO: remove this file that is pretty useless
 """
 
 from __future__ import annotations
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-from environment import MazeEnv
-from policymaker import MazeGrid, Agent
-
-from plot_functions import showPNG   # TODO: what is it for? can we remove it?
+from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.policymaker import Agent
 
 
 def main():

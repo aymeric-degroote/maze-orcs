@@ -16,16 +16,19 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from training import train_agnostic_agent, initialize_training, fine_tune_agent
+from minigrid_utilities.training import train_agnostic_agent, initialize_training, fine_tune_agent
 
 
 def main(render_mode=None):
-    num_episodes = 3000
-    max_num_step = 100
+    num_episodes = 10000
+    num_episodes_fine_tune = 1000
+    max_num_step = 200
+    num_mazes = 10
+
     step_print = 100
     size = 13
     learning_rate = 1e-4
-    reward_new_cell = 0.01
+    reward_new_cell = 0 #.01
 
     agnostic_method = "batch"
     batch_size = 10
@@ -60,22 +63,20 @@ def main(render_mode=None):
     plt.plot(stats["reward_over_episodes"])
     plt.xlabel("Episodes")
     plt.ylabel("Reward")
-    plt.savefig(f"plots/agnostic-{agnostic_method}-agent-rewards.png")
+    plt.savefig(f"runs_minigrid/plots/agnostic-{agnostic_method}-agent-rewards.png")
     plt.show()
 
     w = step_print
     plt.plot(np.convolve(stats["reward_over_episodes"], np.ones(w), 'valid') / w)
     plt.xlabel(f"Average Reward over {w} episodes")
     plt.ylabel("Reward")
-    plt.savefig(f"plots/agnostic-{agnostic_method}-agent-average-rewards.png")
+    plt.savefig(f"runs_minigrid/plots/agnostic-{agnostic_method}-agent-average-rewards.png")
     plt.show()
 
     test_over_mazes = True
     if test_over_mazes:
         print("-- Training fine-tuned models --")
-        num_mazes = 10
-        num_episodes = 300
-        rewards_per_maze = np.zeros((num_mazes, num_episodes))
+        rewards_per_maze = np.zeros((num_mazes, num_episodes_fine_tune))
 
         for maze_seed in range(num_mazes):
             print(f"-- Maze seed {maze_seed} --")
@@ -85,7 +86,7 @@ def main(render_mode=None):
             ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
 
             stats = fine_tune_agent(agent, env, maze_seed=maze_seed,
-                                    num_episodes=num_episodes,
+                                    num_episodes=num_episodes_fine_tune,
                                     max_num_step=max_num_step,
                                     step_print=step_print,
                                     save_weights_fn=ft_save_weights_fn)
@@ -97,7 +98,7 @@ def main(render_mode=None):
         plt.plot(rewards_per_maze.mean(axis=0), c='red', label="Average")
         plt.legend()
         plt.title(f"Reward per episode")
-        plt.savefig(f"plots/fine-tuned-{agnostic_method}-agents-rewards.png")
+        plt.savefig(f"runs_minigrid/plots/fine-tuned-{agnostic_method}-agents-rewards.png")
         plt.show()
 
         w = step_print
@@ -106,7 +107,7 @@ def main(render_mode=None):
         plt.plot(np.convolve(rewards_per_maze.mean(axis=0), np.ones(w), 'valid') / w, c='red', label="Average")
         plt.legend()
         plt.xlabel(f"Average Reward over {w} episodes")
-        plt.savefig(f"plots/agnostic-{agnostic_method}-agent-average-rewards.png")
+        plt.savefig(f"runs_minigrid/plots/fine-tuned-{agnostic_method}-agent-average-rewards.png")
         plt.show()
 
 

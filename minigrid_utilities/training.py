@@ -1,7 +1,7 @@
 import numpy as np
 
-from environment import MazeEnv
-from policymaker import Agent
+from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.policymaker import Agent
 
 
 def initialize_training(obs_space_dims,
@@ -112,8 +112,8 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
 
     stats = {
         "reward_over_episodes": [],
-        "nb_cells_seen": [],
-        "nb_actions": [],
+        "nb_cells_seen_over_episodes": [],
+        "nb_actions_over_episodes": [],
     }
 
     for ep_id in range(num_episodes):

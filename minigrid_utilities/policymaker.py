@@ -167,8 +167,13 @@ class Agent:
         self.rewards = []
         self.actions_to_do = []
 
+    def save_weights(self, weights_fn):
+        fn = os.path.join(self.path, "runs_minigrid/weights", weights_fn)
+        torch.save(self.net.state_dict(), fn)
+        return fn
+
     def load_weights(self, load_weights_fn):
-        fn = os.path.join(self.path, "weights", load_weights_fn)
+        fn = os.path.join(self.path, "runs_minigrid/weights", load_weights_fn)
         self.net.load_state_dict(torch.load(fn))
         print("Loaded model weights from", fn)
 
@@ -261,11 +266,6 @@ class Agent:
         # Empty / zero out all episode-centric/related variables
         self.log_probs = []
         self.rewards = []
-
-    def save_weights(self, weights_fn, path="."):
-        fn = os.path.join(path, "weights", weights_fn)
-        torch.save(self.net.state_dict(), fn)
-        return fn
 
     def random_policy(self, observation=None):
         if self.maze.can_move_forward():
