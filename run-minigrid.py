@@ -15,10 +15,10 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from environment import MazeEnv
-from policymaker import Agent
+from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.policymaker import Agent
 
-from training import run_agent
+from minigrid_utilities.training import run_agent
 
 
 def main(render_mode=None):
