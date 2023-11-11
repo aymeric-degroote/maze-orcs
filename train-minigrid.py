@@ -11,18 +11,15 @@ https://gymnasium.farama.org/tutorials/training_agents/reinforce_invpend_gym_v26
 
 from __future__ import annotations
 
-import os
 import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 
 from training import train_agnostic_agent, initialize_training, fine_tune_agent
 
 
 def main(render_mode=None):
-    
     num_episodes = 3000
     max_num_step = 100
     step_print = 100
@@ -35,68 +32,39 @@ def main(render_mode=None):
 
     run_id = 42
     save_agnostic_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}.pth"
-    load_weights_fn = save_agnostic_weights_fn  # None
-    param_file = f"param_model{run_id}.pkl"
+    load_weights_fn = save_agnostic_weights_fn   # None
 
     obs_space_dims = 49
-    hidden_space_dims = [16,16]
+    hidden_space_dims = [16, 16]
     action_space_dims = 3
     # TODO: use model_dims to define the NN for the agent policy. or not. idk
-    model_dims = [obs_space_dims]+hidden_space_dims+[action_space_dims]
-
-    # TODO: I really don't like having this params dictionary. I'd rather have a "save" method
-    #  to call for each class. I'll change it later
-    params = {
-        "episode": 0,
-        "reward_over_episodes": [],
-        "model_dims": model_dims,
-        "max_num_step": max_num_step,
-        "size": size,
-        "method":agnostic_method,
-    }
-
-    # TODO: pickle is weird for this, we should save the runs in a csv file instead I think
-    if not os.path.isfile(param_file):
-        with open(param_file, 'wb') as fp:
-            pickle.dump(params, fp)
-        print("Saving params dict in", param_file)
-    else:
-        with open(param_file, 'rb') as fp:
-            params = pickle.load(fp)
-        print("Loaded params dict from", param_file)
+    model_dims = [obs_space_dims] + hidden_space_dims + [action_space_dims]
 
     agent, env = initialize_training(obs_space_dims,
-                                              action_space_dims,
-                                              size=size,
-                                              load_weights_fn=load_weights_fn,
-                                              learning_rate=learning_rate,
-                                              render_mode=render_mode,
-                                              reward_new_cell=reward_new_cell)
+                                     action_space_dims,
+                                     size=size,
+                                     load_weights_fn=load_weights_fn,
+                                     learning_rate=learning_rate,
+                                     render_mode=render_mode,
+                                     reward_new_cell=reward_new_cell)
 
     print("-- Training agnostic model --")
     stats = train_agnostic_agent(agent, env,
-                         method=agnostic_method,
-                         num_episodes=num_episodes,
-                         max_num_step=max_num_step,
-                         step_print=step_print,
-                         save_weights_fn=save_agnostic_weights_fn,
-                         batch_size=batch_size)
+                                 method=agnostic_method,
+                                 num_episodes=num_episodes,
+                                 max_num_step=max_num_step,
+                                 step_print=step_print,
+                                 save_weights_fn=save_agnostic_weights_fn,
+                                 batch_size=batch_size)
 
-    params["reward_over_episodes"] += stats["reward_over_episodes"]
-    params["episode"] += num_episodes
-
-    with open(param_file, 'wb') as fp:
-        pickle.dump(params, fp)
-        print("Saving params dict in", param_file)
-
-    plt.plot(params["reward_over_episodes"])
+    plt.plot(stats["reward_over_episodes"])
     plt.xlabel("Episodes")
     plt.ylabel("Reward")
     plt.savefig(f"plots/agnostic-{agnostic_method}-agent-rewards.png")
     plt.show()
 
     w = step_print
-    plt.plot(np.convolve(params["reward_over_episodes"], np.ones(w), 'valid') / w)
+    plt.plot(np.convolve(stats["reward_over_episodes"], np.ones(w), 'valid') / w)
     plt.xlabel(f"Average Reward over {w} episodes")
     plt.ylabel("Reward")
     plt.savefig(f"plots/agnostic-{agnostic_method}-agent-average-rewards.png")

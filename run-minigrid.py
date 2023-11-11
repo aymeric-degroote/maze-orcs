@@ -17,9 +17,8 @@ import matplotlib.pyplot as plt
 
 from environment import MazeEnv
 from policymaker import Agent
-import pickle
 
-from training import run_episode, run_agent
+from training import run_agent
 
 
 def main(render_mode=None):
@@ -30,27 +29,27 @@ def main(render_mode=None):
     agnostic_method = "batch"
     run_id = 42
     maze_seed = 3
+    window_size = 100
+
     weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
     load_weights = weights_fn
 
     change_maze_at_each_episode = (maze_seed is None)
 
     obs_space_dims = 49
-    hidden_space_dims = [16, 16]
     action_space_dims = 3
 
     env = MazeEnv(render_mode=render_mode,
-        size=size,
-        maze_type="prims",  # "dungeon"
-        maze_seed=maze_seed,
-    )
+                  size=size,
+                  maze_type="prims",  # "dungeon"
+                  maze_seed=maze_seed,
+                  )
 
     agent = Agent(obs_space_dims, action_space_dims,
                   size=env.size,
                   load_maze=False,
                   training=False,
                   load_weights_fn=load_weights,
-                  # policy="network"
                   )
 
     stats = run_agent(agent, env, num_episodes, max_num_step,
@@ -70,7 +69,7 @@ def main(render_mode=None):
     plt.ylabel("Reward")
     plt.show()
 
-    w = 100
+    w = window_size
     plt.plot(np.convolve(reward_over_episodes, np.ones(w), 'valid') / w)
     plt.xlabel("Episodes")
     plt.ylabel("Average Reward over 100 episodes")
