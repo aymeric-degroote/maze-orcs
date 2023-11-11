@@ -11,44 +11,51 @@ https://gymnasium.farama.org/tutorials/training_agents/reinforce_invpend_gym_v26
 
 from __future__ import annotations
 
+import os
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
-import pandas as pd
-import seaborn as sns
-import os
-
-from environment import MazeEnv
-from policymaker import MazeGrid, Agent
-import gymnasium as gym
 import pickle
 
-def main():
+from training import train_agnostic_agent, initialize_training, fine_tune_agent
+
+
+def main(render_mode=None):
     
-    num_episodes = 1000
+    num_episodes = 3000
     max_num_step = 100
     step_print = 100
     size = 13
-    weights_fn = "model_weights.pth"
-    load_weights = weights_fn
-    training = True
     learning_rate = 1e-4
-    param_file = "param_model1.pkl"
-    reward_new_cell = 0 #.01
-    
+    reward_new_cell = 0.01
+
+    agnostic_method = "batch"
+    batch_size = 10
+
+    run_id = 42
+    save_agnostic_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}.pth"
+    load_weights_fn = save_agnostic_weights_fn  # None
+    param_file = f"param_model{run_id}.pkl"
+
     obs_space_dims = 49
     hidden_space_dims = [16,16]
     action_space_dims = 3
+    # TODO: use model_dims to define the NN for the agent policy. or not. idk
     model_dims = [obs_space_dims]+hidden_space_dims+[action_space_dims]
-    
+
+    # TODO: I really don't like having this params dictionary. I'd rather have a "save" method
+    #  to call for each class. I'll change it later
     params = {
         "episode": 0,
         "reward_over_episodes": [],
         "model_dims": model_dims,
         "max_num_step": max_num_step,
         "size": size,
+        "method":agnostic_method,
     }
-    
+
+    # TODO: pickle is weird for this, we should save the runs in a csv file instead I think
     if not os.path.isfile(param_file):
         with open(param_file, 'wb') as fp:
             pickle.dump(params, fp)
@@ -57,83 +64,94 @@ def main():
         with open(param_file, 'rb') as fp:
             params = pickle.load(fp)
         print("Loaded params dict from", param_file)
-    
-    env = MazeEnv(#render_mode="human", 
-                  size=size, 
-                  maze_type="prims", # "dungeon"
-                  reward_new_cell=reward_new_cell,
-                 )
-    
-    torch.manual_seed(0)
-    np.random.seed(0)
 
-    agent = Agent(obs_space_dims, action_space_dims, 
-                  size=env.size,
-                  load_maze=False,
-                  training=training,
-                  load_weights=load_weights,
-                  learning_rate = learning_rate,
-                    #policy="network"
-                    )
-    
-    nb_cells_seen_over_episodes = []
+    agent, env = initialize_training(obs_space_dims,
+                                              action_space_dims,
+                                              size=size,
+                                              load_weights_fn=load_weights_fn,
+                                              learning_rate=learning_rate,
+                                              render_mode=render_mode,
+                                              reward_new_cell=reward_new_cell)
 
-    for ep_id in range(params["episode"], params["episode"]+num_episodes):
-        observation, info = env.reset(seed=ep_id)
-        observation = observation.get('image')[:,:,0]
-        
-        #env.agent_pos = env.agent_start_pos
-        
+    print("-- Training agnostic model --")
+    stats = train_agnostic_agent(agent, env,
+                         method=agnostic_method,
+                         num_episodes=num_episodes,
+                         max_num_step=max_num_step,
+                         step_print=step_print,
+                         save_weights_fn=save_agnostic_weights_fn,
+                         batch_size=batch_size)
 
-        ep_reward = 0
-        for i in range(max_num_step):
-            action = agent.policy(observation)
+    params["reward_over_episodes"] += stats["reward_over_episodes"]
+    params["episode"] += num_episodes
 
-            observation, reward, terminated, truncated, info = env.step(action)
-            observation = observation.get('image')[:,:,0]
+    with open(param_file, 'wb') as fp:
+        pickle.dump(params, fp)
+        print("Saving params dict in", param_file)
 
-            agent.rewards.append(reward)
-            ep_reward += reward
-
-            if terminated or truncated:
-                break
-
-        params["reward_over_episodes"].append(ep_reward)
-        agent.update()
-        
-        _, agent_pos_seen = env.get_stats()
-        nb_cells_seen = len(agent_pos_seen)
-        nb_cells_seen_over_episodes.append(nb_cells_seen)
-
-
-        if (ep_id+1)%step_print == 0:
-            print(f"Episode {str(ep_id+1).rjust(3)}: "
-                  f"Average Reward {np.mean(params['reward_over_episodes'][-step_print:]):.4f} "
-                  f"Cells seen {np.mean(nb_cells_seen_over_episodes[-step_print:])} ")
-            
-            fn = agent.save_weights(weights_fn)
-            print("Saved model weights in", fn)
-            with open(param_file, 'wb') as fp:
-                pickle.dump(params, fp)
-                print("Saving params dict in", param_file)
-            #print("positions:", agent_pos_seen)
-            #print("dist:", agent.network_policy(observation, get_dist=True))
-            
-        
-        params["episode"] += 1
-    
-    
     plt.plot(params["reward_over_episodes"])
     plt.xlabel("Episodes")
     plt.ylabel("Reward")
+    plt.savefig(f"plots/agnostic-{agnostic_method}-agent-rewards.png")
     plt.show()
 
     w = step_print
     plt.plot(np.convolve(params["reward_over_episodes"], np.ones(w), 'valid') / w)
     plt.xlabel(f"Average Reward over {w} episodes")
     plt.ylabel("Reward")
+    plt.savefig(f"plots/agnostic-{agnostic_method}-agent-average-rewards.png")
     plt.show()
+
+    test_over_mazes = True
+    if test_over_mazes:
+        print("-- Training fine-tuned models --")
+        num_mazes = 10
+        num_episodes = 300
+        rewards_per_maze = np.zeros((num_mazes, num_episodes))
+
+        for maze_seed in range(num_mazes):
+            print(f"-- Maze seed {maze_seed} --")
+
+            # instead of making a copy of the agent, we simply load the weights of the agnostic model
+            agent.load_weights(save_agnostic_weights_fn)
+            ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
+
+            stats = fine_tune_agent(agent, env, maze_seed=maze_seed,
+                                    num_episodes=num_episodes,
+                                    max_num_step=max_num_step,
+                                    step_print=step_print,
+                                    save_weights_fn=ft_save_weights_fn)
+            rewards_per_maze[maze_seed] = stats["reward_over_episodes"]
+
+        # Plot to see how fast it converges with one agnostic method or another
+        for maze_seed in range(num_mazes):
+            plt.plot(rewards_per_maze[maze_seed], c='gray', alpha=0.5)
+        plt.plot(rewards_per_maze.mean(axis=0), c='red', label="Average")
+        plt.legend()
+        plt.title(f"Reward per episode")
+        plt.savefig(f"plots/fine-tuned-{agnostic_method}-agents-rewards.png")
+        plt.show()
+
+        w = step_print
+        for maze_seed in range(num_mazes):
+            plt.plot(np.convolve(rewards_per_maze[maze_seed], np.ones(w), 'valid') / w, c='gray', alpha=0.5)
+        plt.plot(np.convolve(rewards_per_maze.mean(axis=0), np.ones(w), 'valid') / w, c='red', label="Average")
+        plt.legend()
+        plt.xlabel(f"Average Reward over {w} episodes")
+        plt.savefig(f"plots/agnostic-{agnostic_method}-agent-average-rewards.png")
+        plt.show()
 
 
 if __name__ == "__main__":
-    main()
+    # TODO: add all possible arguments
+    # -seed seed
+    # -render human
+    # -num_episodes num_episodes
+    # -method maml
+
+    if len(sys.argv) > 1:
+        render_mode = sys.argv[1]
+        if render_mode == "human":
+            main(render_mode)
+    else:
+        main()

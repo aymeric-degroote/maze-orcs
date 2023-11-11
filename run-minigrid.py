@@ -11,84 +11,60 @@ https://gymnasium.farama.org/tutorials/training_agents/reinforce_invpend_gym_v26
 
 from __future__ import annotations
 
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
-import pandas as pd
-import seaborn as sns
-import os
 
 from environment import MazeEnv
-from policymaker import MazeGrid, Agent
-import gymnasium as gym
+from policymaker import Agent
 import pickle
 
-def main():
-    
+from training import run_episode, run_agent
+
+
+def main(render_mode=None):
     num_episodes = 1000
     max_num_step = 100
-    
-    size = 13
-    weights_fn = "model_weights.pth"
-    load_weights = weights_fn
-    param_file = "param_model1.pkl"
-    
-    obs_space_dims = 49
-    hidden_space_dims = [16,16]
-    action_space_dims = 3
-    model_dims = [obs_space_dims]+hidden_space_dims+[action_space_dims]
-    
-    with open(param_file, 'rb') as fp:
-        params = pickle.load(fp)
-    print("Loaded params dict from", param_file)
-    
-    env = MazeEnv(render_mode="human", 
-                  size=size, 
-                  maze_type="prims", # "dungeon"
-                 )
-    
-    torch.manual_seed(0)
-    np.random.seed(0)
 
-    agent = Agent(obs_space_dims, action_space_dims, 
+    size = 13
+    agnostic_method = "batch"
+    run_id = 42
+    maze_seed = 3
+    weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
+    load_weights = weights_fn
+
+    change_maze_at_each_episode = (maze_seed is None)
+
+    obs_space_dims = 49
+    hidden_space_dims = [16, 16]
+    action_space_dims = 3
+
+    env = MazeEnv(render_mode=render_mode,
+        size=size,
+        maze_type="prims",  # "dungeon"
+        maze_seed=maze_seed,
+    )
+
+    agent = Agent(obs_space_dims, action_space_dims,
                   size=env.size,
                   load_maze=False,
                   training=False,
-                  load_weights=load_weights,
-                    #policy="network"
-                    )
-    
-    reward_over_episodes = []
-    nb_cells_seen_over_episodes = []
+                  load_weights_fn=load_weights,
+                  # policy="network"
+                  )
 
-    for ep_id in range(params["episode"], params["episode"]+num_episodes):
-        observation, info = env.reset(seed=ep_id)
-        observation = observation.get('image')[:,:,0]
+    stats = run_agent(agent, env, num_episodes, max_num_step,
+                      change_maze_at_each_episode=change_maze_at_each_episode,
+                      training=False)
 
-        ep_reward = 0
-        for i in range(max_num_step):
-            action = agent.policy(observation)
+    reward_over_episodes = stats["reward_over_episodes"]
+    nb_cells_seen_over_episodes = stats["nb_cells_seen"]
+    nb_actions_over_episodes = stats["nb_actions"]
 
-            observation, reward, terminated, truncated, info = env.step(action)
-            observation = observation.get('image')[:,:,0]
+    print(f"Average Reward {np.mean(reward_over_episodes):.4f}")
+    print(f"Cells seen {np.mean(nb_cells_seen_over_episodes):.2f}")
+    print(f"Actions taken {np.mean(nb_actions_over_episodes):.2f}")
 
-            agent.rewards.append(reward)
-            ep_reward += reward
-
-            if terminated or truncated:
-                break
-
-        reward_over_episodes.append(ep_reward)
-        
-        _, agent_pos_seen = env.get_stats()
-        nb_cells_seen = len(agent_pos_seen)
-        nb_cells_seen_over_episodes.append(nb_cells_seen)
-
-
-    print(f"Average Reward {np.mean(reward_over_episodes):.4f} "
-          f"Cells seen {np.mean(nb_cells_seen_over_episodes)} ")
-     
-    
     plt.plot(reward_over_episodes)
     plt.xlabel("Episodes")
     plt.ylabel("Reward")
@@ -102,4 +78,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    if len(sys.argv) > 1:
+        render_mode = sys.argv[1]
+        if render_mode == "human":
+            main(render_mode)
+    else:
+        main()
