@@ -1,4 +1,8 @@
+
+from copy import deepcopy
+
 import numpy as np
+import torch
 
 from minigrid_utilities.environment import MazeEnv
 from minigrid_utilities.policymaker import Agent
@@ -40,6 +44,7 @@ def initialize_training(obs_space_dims,
 def train_agnostic_agent(agent, env, method,
                          num_episodes,
                          max_num_step,
+                         num_episodes_per_maze=None,
                          step_print=None,
                          save_weights_fn=None,
                          batch_size=None
@@ -64,8 +69,14 @@ def train_agnostic_agent(agent, env, method,
                          step_print=step_print,
                          save_weights_fn=save_weights_fn,
                          batch_size=batch_size)
-    elif method == "MAML":
-        raise NotImplementedError
+    elif method.lower() == "maml":
+        assert num_episodes_per_maze is not None, "arg 'num_episodes_per_maze' missing"
+        return run_maml_agent(agent, env, num_episodes, max_num_step,
+                              num_episodes_per_maze,
+                              batch_size,
+                              # alpha_lr=None, beta_lr=None,
+                              save_weights_fn=save_weights_fn
+                              )
     else:
         raise NameError(f"method '{method}' unknown")
 
@@ -110,11 +121,7 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
     assert training == agent.training, f"Agent is in {'training' if agent.training else 'eval'} mode " \
                                        f"but you are running in {'training' if training else 'eval'} mode"
 
-    stats = {
-        "reward_over_episodes": [],
-        "nb_cells_seen_over_episodes": [],
-        "nb_actions_over_episodes": [],
-    }
+    stats = init_stats()
 
     for ep_id in range(num_episodes):
         if change_maze_at_each_episode:
@@ -145,3 +152,100 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
                 print("saved model weights in", fn)
 
     return stats
+
+
+def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze,
+                   batch_size, alpha_lr=None, beta_lr=0.01,
+                   step_print=None, save_weights_fn=None
+                   ):
+    """
+    Implementation of Algorithm 3 from: https://arxiv.org/abs/1703.03400
+    H: max_num_step
+    K: num_episodes_fine_tune
+
+    """
+    assert agent.training, f"Agent is in eval mode"
+
+    num_batches = num_episodes // (num_episodes_per_maze * batch_size)
+    maze_seeds = [-1]
+
+    stats = init_stats()
+
+    for batch_id in range(num_batches):
+        print(f"-- Batch {batch_id} --")
+        agnostic_weights = agent.get_weights(copy=True)
+
+        batch_rewards = []
+
+        # TODO: do we want to have new mazes for each batch? I assumed so
+        # TODO: use iter function to generate the seeds
+        maze_seeds = list(range(maze_seeds[-1]+1, maze_seeds[-1]+1+batch_size))
+
+        ft_weights_grad_list = {}
+
+        for maze_seed in maze_seeds:
+            print(f"-- Maze #{maze_seed} --", end="\r")
+            env.reset(maze_seed=maze_seed)
+
+            agent.set_weights(agnostic_weights)
+            maze_reward = 0
+            for ep_id in range(num_episodes_per_maze//2):
+                ep_reward = run_episode(agent, env, max_num_step)
+                maze_reward += ep_reward
+
+                stats["reward_over_episodes"].append(ep_reward)
+
+            # update agent after K episodes
+            # technically summing the loss whereas the paper take the average...
+            agent.update()  # TODO: use alpha_lr
+
+            for ep_id in range(num_episodes_per_maze//2):
+                ep_reward = run_episode(agent, env, max_num_step)
+                maze_reward += ep_reward
+
+                stats["reward_over_episodes"].append(ep_reward)
+
+            batch_rewards.append(maze_reward/num_episodes_per_maze)
+            #batch_rewards.append(ep_reward)
+
+            loss = agent.compute_loss()
+            loss.backward()
+
+            # TODO: the following should be in the Agent class
+            # state_dict doesn't return the grad tensors
+            for weight_name, tensor in enumerate(agent.net.parameters()):
+                if weight_name not in ft_weights_grad_list:
+                    ft_weights_grad_list[weight_name] = []
+
+                ft_weights_grad = deepcopy(tensor.grad)
+                ft_weights_grad_list[weight_name].append(ft_weights_grad)
+                tensor.grad.zero_()
+
+            agent.log_probs = []
+            agent.rewards = []
+
+        agent.set_weights(agnostic_weights)
+        for weight_name, param in enumerate(agent.net.parameters()):
+            # Important that it's not a copy here
+            grad_tensor = sum(ft_weights_grad_list[weight_name])
+            with torch.no_grad():
+                #print('beta', beta_lr, '      ')
+                #print('grad', grad_tensor)
+                param -= beta_lr * grad_tensor
+
+        print(f"Batch {str(batch_id + 1).rjust(3)} "
+              f"| Average Reward {np.mean(batch_rewards):.4f}")
+
+        if save_weights_fn:
+            fn = agent.save_weights(save_weights_fn)
+            print("saved model weights in", fn)
+
+    return stats
+
+
+def init_stats():
+    return {
+        "reward_over_episodes": [],
+        "nb_cells_seen_over_episodes": [],
+        "nb_actions_over_episodes": [],
+    }

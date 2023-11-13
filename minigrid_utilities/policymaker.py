@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -177,6 +179,18 @@ class Agent:
         self.net.load_state_dict(torch.load(fn))
         print("Loaded model weights from", fn)
 
+    def get_weights(self, copy=False):
+        """
+        Returns the weights of the model. It does NOT return a
+        """
+        if copy:
+            return deepcopy(self.net.state_dict())
+        else:
+            return self.net.state_dict()
+
+    def set_weights(self, weights):
+        self.net.load_state_dict(weights)
+
     def policy(self, observation):
         """
         0: left     1: right     2: forward
@@ -241,8 +255,7 @@ class Agent:
 
         return int(action)
 
-    def update(self):
-        """Updates the policy network's weights."""
+    def compute_loss(self):
         running_g = 0
         gs = []
 
@@ -253,14 +266,22 @@ class Agent:
 
         deltas = torch.tensor(gs)
 
-        loss = 0
+        loss = torch.tensor(0.)
         # minimize -1 * prob * reward obtained
         for log_prob, delta in zip(self.log_probs, deltas):
             loss += log_prob.mean() * delta * (-1)
 
+        return loss
+
+    def update(self, loss=None, do_backward=True):
+        """Updates the policy network's weights."""
+        if loss is None:
+            loss = self.compute_loss()
+
         # Update the policy network
-        self.optimizer.zero_grad()
-        loss.backward()
+        if do_backward:
+            self.optimizer.zero_grad()
+            loss.backward()
         self.optimizer.step()
 
         # Empty / zero out all episode-centric/related variables
