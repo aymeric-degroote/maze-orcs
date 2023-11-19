@@ -22,7 +22,7 @@ in the terminal.
 Module for training a maze navigator via DQN. In this task the agent is rewarded 
 when it successfully navigates to the red box in the map. Maps are randomly generated 
 mazes, and you can run training via:
-'''
+```
 python3 maze_dqn.py
-'''
+```
 after installing dependencies
