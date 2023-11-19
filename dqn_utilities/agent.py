@@ -36,9 +36,9 @@ class DQNAgent:
         self.update_target_network()
         self.target_network.eval()
 
-        # self.optimiser = torch.optim.RMSprop(self.policy_network.parameters()
-        #     , lr=lr)        
-        self.optimiser = torch.optim.Adam(self.policy_network.parameters(), lr=lr)
+        self.optimiser = torch.optim.RMSprop(self.policy_network.parameters()
+            , lr=lr)        
+        # self.optimiser = torch.optim.Adam(self.policy_network.parameters(), lr=lr)
 
         self.device = device
 
