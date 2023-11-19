@@ -1,3 +1,4 @@
+from typing import SupportsFloat
 import gymnasium as gym
 from gymnasium import spaces
 import cv2
@@ -32,3 +33,16 @@ class PyTorchFrame(gym.ObservationWrapper):
 
     def observation(self, observation):
         return np.rollaxis(observation, 2)
+    
+
+class BetterReward(gym.RewardWrapper):
+    '''Reward on absolute distance to goal'''
+    def __init__(self, env):
+        super(BetterReward, self).__init__(env)
+        self.env = env
+        
+    def reward(self, reward):
+        agent = self.env.agent
+        box = self.env.box
+        bonus = 5000*reward if self.near(self.box) else 0
+        return -np.linalg.norm(box.pos - agent.pos) + bonus
