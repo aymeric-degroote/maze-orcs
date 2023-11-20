@@ -65,7 +65,7 @@ min_epsilon = 0.01
 decay_rate = 0.9999
 
 
-for t in tqdm(range(100000)):
+for t in tqdm(range(500000)):
     
     if t % 1000 == 0:
         print(f'training episode step {t+1}, moving avg reward: {movingAverage}, episode # {num_episodes}, episodes in current maze: {maze_eps}, epsilon: {epsilon}')
