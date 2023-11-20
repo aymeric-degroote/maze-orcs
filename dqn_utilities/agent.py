@@ -2,8 +2,8 @@
 from gymnasium import spaces
 import numpy as np
 
-from utilities.dqn_atari_model import DQN
-from utilities.memory import ReplayBuffer
+from dqn_utilities.dqn_atari_model import DQN
+from dqn_utilities.memory import ReplayBuffer
 import torch
 import torch.nn.functional as F
 

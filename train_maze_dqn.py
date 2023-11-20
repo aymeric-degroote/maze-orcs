@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from dqn_utilities.wrappers import WarpFrame, PyTorchFrame, BetterReward
+from dqn_utilities.wrappers import WarpFrame, PyTorchFrame, BetterReward, MaxAndSkipEnv, FrameStack
 from dqn_utilities.agent import DQNAgent
 from dqn_utilities.memory import ReplayBuffer
 from tqdm import tqdm
@@ -23,9 +23,16 @@ env = PedroMaze(num_rows=4,
 
 
 # env = WarpFrame(env)
+# env = PyTorchFrame(env)
+# env = BetterReward(env)
+
+env = MaxAndSkipEnv(env, skip=4)
+env = WarpFrame(env)
 env = PyTorchFrame(env)
-env = BetterReward(env)
+# env = ClipRewardEnv(env)
+env = FrameStack(env, 4)
 print("initialized environment...")
+print(f'OBS SPACE: {env.observation_space}')
 
 
 replay_buffer = ReplayBuffer(5000)
@@ -55,13 +62,13 @@ steps_in_maze = 0
 num_episodes = 0
 epsilon = 1.0
 min_epsilon = 0.01
-decay_rate = 0.99999
+decay_rate = 0.9999
 
 
-for t in tqdm(range(3000000)):
+for t in tqdm(range(100000)):
     
     if t % 1000 == 0:
-        print(f'training episode step {t}, moving avg reward: {movingAverage}, episode # {num_episodes}, episodes in current maze: {maze_eps}, epsilon: {epsilon}')
+        print(f'training episode step {t+1}, moving avg reward: {movingAverage}, episode # {num_episodes}, episodes in current maze: {maze_eps}, epsilon: {epsilon}')
 
 
     if np.random.choice([True, False], p=[epsilon,1-epsilon]):
@@ -83,8 +90,11 @@ for t in tqdm(range(3000000)):
         if num_episodes >= 110:
             movingAverage=np.mean(episode_rewards[len(episode_rewards)-100:len(episode_rewards)-1])
         if maze_eps >= 500:
+            # change maze
             env.room_rng = np.random.default_rng(seed = t)
-            agent.memory = ReplayBuffer(5000)
+
+            #reset replay buffer for maze
+            # agent.memory = ReplayBuffer(5000)
             steps_in_maze = 0
             maze_eps = 0
             epsilon = 1.0
