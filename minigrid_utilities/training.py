@@ -16,10 +16,13 @@ def initialize_training(obs_space_dims,
                         learning_rate=None,
                         reward_new_cell=None,
                         maze_type=None,
+                        buffer_size=None,
                         **kwargs):
     # TODO: not sure if it is good practice to play around with kwargs
     if learning_rate is not None:
         kwargs["learning_rate"] = learning_rate
+    if buffer_size is not None:
+        kwargs["buffer_size"] = buffer_size
 
     agent = Agent(obs_space_dims, action_space_dims,
                   size=size,
@@ -56,7 +59,10 @@ def train_agnostic_agent(agent, env, method,
         - MAML: Model-Agnostic Meta-Learning algorithm
     """
 
-    if method == "classic":
+    if method == "scratch":
+        # no training at all, so the model is undoubtedly agnostic
+        return init_stats()
+    elif method == "classic":
         return run_agent(agent, env, num_episodes, max_num_step,
                          change_maze_at_each_episode=True,
                          training=True,

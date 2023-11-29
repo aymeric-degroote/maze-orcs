@@ -68,8 +68,8 @@ class PolicyNetwork(nn.Module):
         """
         super().__init__()
 
-        hidden_space1 = 16
-        hidden_space2 = 16
+        hidden_space1 = 64
+        hidden_space2 = 32
 
         # Create Network
         # TODO: make a real NN, not this thing
@@ -79,7 +79,7 @@ class PolicyNetwork(nn.Module):
             # nn.Conv2d(20,64,5),
             # nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(obs_space_dims * 4, hidden_space1),
+            nn.Linear(obs_space_dims, hidden_space1),
             nn.Tanh(),
             nn.Linear(hidden_space1, hidden_space2),
             nn.Tanh(),
@@ -110,7 +110,8 @@ class Agent:
                  pos=None, direction=0, policy=None,
                  verbose=False, load_maze=False, training=False,
                  load_weights_fn=None, network=True, path='.',
-                 learning_rate=1e-4, **kwargs):
+                 learning_rate=1e-4, gamma=0.95, buffer_size=None,
+                 **kwargs):
 
         if kwargs:
             print("Agent init: unused kwargs:", kwargs)
@@ -122,6 +123,11 @@ class Agent:
 
         self.pos = pos  # never used
         self.direction = direction  # never used
+
+        if buffer_size is None:
+            buffer_size = 1
+
+        self.buffer = torch.zeros((1, buffer_size, obs_space_dims * 4))
 
         self.policies = {"random": self.random_policy}
 
@@ -136,13 +142,13 @@ class Agent:
         if network:
             # Hyperparameters
             self.learning_rate = learning_rate  # Learning rate for policy optimization
-            self.gamma = 0.95  # Discount factor
+            self.gamma = gamma  # Discount factor
             self.eps = 1e-6  # small number for mathematical stability
 
             self.log_probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
-            self.net = PolicyNetwork(obs_space_dims, action_space_dims)
+            self.net = PolicyNetwork(obs_space_dims*buffer_size*4, action_space_dims)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -237,10 +243,13 @@ class Agent:
 
         image = np.array([[state == i for i in objects]], dtype=float)
 
-        image = torch.tensor(image)
+        self.buffer = np.roll(self.buffer, 1, axis=1)
+        self.buffer[0,0] = image.flatten()
+
+        obs = torch.tensor(self.buffer)
 
         # returns probability of taking each action
-        distrib = self.net(image).squeeze()
+        distrib = self.net(obs).squeeze()
         # use squeeze() only if batch of 1
         # TODO: do we always have a batch of 1?
 
