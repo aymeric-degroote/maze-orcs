@@ -38,7 +38,7 @@ def main(render_mode=None):
     #agnostic_method = "batch"
     agnostic_method = "maml"
 
-    run_id = 44
+    run_id = 50
     save_agnostic_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}.pth"
     load_weights_fn = save_agnostic_weights_fn   # None
     # TODO. save the config of the run in a file

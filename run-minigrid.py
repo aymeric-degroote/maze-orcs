@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from minigrid_utilities.environment import MazeEnv
 from minigrid_utilities.policymaker import Agent
 
-from minigrid_utilities.training import run_agent
+from minigrid_utilities.training import run_agent, initialize_training
 
 
 def main(render_mode=None):
@@ -26,12 +26,15 @@ def main(render_mode=None):
     max_num_step = 100
 
     size = 13
-    agnostic_method = "batch"
-    run_id = 42
-    maze_seed = 3
     window_size = 100
 
+    maze_seed = 3
+    agnostic_method = "batch"
+    run_id = 42
+
     weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
+
+    #weights_fn = "model_weights_seed-0.pth"
     load_weights = weights_fn
 
     change_maze_at_each_episode = (maze_seed is None)

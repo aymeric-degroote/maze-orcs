@@ -66,8 +66,7 @@ class MazeEnv(MiniGridEnv):
         return "We are not using this function obviously"
 
     def _gen_positions(self):
-        if self.maze_seed is not None:
-            np.random.seed(self.maze_seed)
+        self.reset_to_seed()
 
         self.agent_start_pos = (1 + 2 * np.random.randint(self.size // 2),
                                 1 + 2 * np.random.randint(self.size // 2))
@@ -83,8 +82,9 @@ class MazeEnv(MiniGridEnv):
 
         m = Maze()
 
-        if self.maze_seed is not None:
-            random.seed(self.maze_seed)
+        self.reset_to_seed()
+
+        # print(f'Generating maze using seed {self.maze_seed}')
 
         if self.maze_type.lower() == "prims":
             m.generator = Prims(self.size // 2, self.size // 2)
@@ -138,3 +138,8 @@ class MazeEnv(MiniGridEnv):
     def get_stats(self):
 
         return self.total_reward, self.agent_pos_seen, self.nb_actions
+
+    def reset_to_seed(self):
+        if self.maze_seed is not None:
+            random.seed(self.maze_seed)
+            np.random.seed(self.maze_seed)
