@@ -28,15 +28,17 @@ def main(render_mode=None):
     maze_env = "miniworld"
     obs_space_dims = (60, 80, 3)
 
-    num_episodes_fine_tune = 300
+    num_episodes_fine_tune = 1000
 
-    max_num_step = 100
+    max_num_step = 120
 
     step_print = 100
     window_plot = 10 #step_print
     size = 13
     learning_rate = 1e-4
-    discount_factor = 0.95
+    discount_factor = 0.9
+    reward_new_cell = 0.01
+    reward_closer_point = 0.01
 
     buffer_size = 1
 
@@ -70,6 +72,8 @@ def main(render_mode=None):
                                      learning_rate=learning_rate,
                                      render_mode=render_mode,
                                      buffer_size=buffer_size,
+                                     reward_new_cell=reward_new_cell,
+                                     reward_closer_point=reward_closer_point,
                                      discount_factor=discount_factor)
 
     print("-- Training model --")
