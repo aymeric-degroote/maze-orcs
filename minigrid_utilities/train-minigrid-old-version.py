@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.environment import MiniGridMazeEnv
 from minigrid_utilities.policymaker import Agent
 import pickle
 
@@ -61,12 +61,12 @@ def main():
             params = pickle.load(fp)
         print("Loaded params dict from", param_file)
 
-    env = MazeEnv(render_mode="human",
-                  size=size, 
-                  maze_type="prims", # "dungeon"
-                  reward_new_cell=reward_new_cell,
-                  maze_seed=maze_seed,
-                 )
+    env = MiniGridMazeEnv(render_mode="human",
+                          size=size,
+                          maze_gen_algo="prims",  # "dungeon"
+                          reward_new_cell=reward_new_cell,
+                          maze_seed=maze_seed,
+                          )
 
     agent = Agent(obs_space_dims, action_space_dims,
                   size=env.size,

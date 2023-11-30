@@ -59,7 +59,8 @@ class MazeGrid:
 class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
-    def __init__(self, obs_space_dims, action_space_dims: int):
+    def __init__(self, obs_space_dims, action_space_dims: int,
+                 maze_env="minigrid", hidden_space_dims=None):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
         Args:
@@ -68,24 +69,49 @@ class PolicyNetwork(nn.Module):
         """
         super().__init__()
 
-        hidden_space1 = 64
-        hidden_space2 = 32
+        print("Model input size", obs_space_dims)
 
-        # Create Network
-        # TODO: make a real NN, not this thing
-        self.net = nn.Sequential(
-            # nn.Conv2d(1,20,5),
-            # nn.ReLU(),
-            # nn.Conv2d(20,64,5),
-            # nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(obs_space_dims, hidden_space1),
-            nn.Tanh(),
-            nn.Linear(hidden_space1, hidden_space2),
-            nn.Tanh(),
-            nn.Linear(hidden_space2, action_space_dims),
-            nn.Softmax(dim=1)
-        )
+        if maze_env == "minigrid":
+            # TODO: this is a very basic NN
+            #  check in the literature what kind of model architecture they use
+
+            hidden_space_dims = [64, 32]
+            model_dims = [np.prod(obs_space_dims)] + hidden_space_dims + [action_space_dims]
+
+            print("model dims", model_dims)
+            layers = [nn.Flatten()]
+
+            for i in range(len(model_dims)-1):
+                layers.append(nn.Linear(model_dims[i], model_dims[i+1]))
+                layers.append(nn.Tanh())
+
+            layers.append(nn.Softmax(dim=1))
+            self.net = nn.Sequential(*layers)
+        else:
+            # obs_space_dims is (60,80, 3)
+            # action_space_dims is (3)
+
+            # TODO: the hyperparameters are arbitrary
+
+            self.net = nn.Sequential(
+                # size (60, 80, 3)
+                nn.Conv2d(in_channels=3, out_channels=16,
+                          kernel_size=(5,5), stride=(5,5)),
+                nn.ReLU(),
+                # size (12, 16, 16)
+                nn.Conv2d(in_channels=16, out_channels=32,
+                          kernel_size=(4,4), stride=(4,4)),
+                nn.ReLU(),
+                # size (3, 4, 32)
+                nn.Flatten(),
+                # size (3*4*32) = (384)
+                nn.Linear(384, 32),
+                nn.Tanh(),
+                nn.Linear(32, 16),
+                nn.Tanh(),
+                nn.Linear(16, action_space_dims),
+                nn.Softmax(dim=1)
+            )
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
@@ -106,49 +132,43 @@ class Agent:
                     1: "right",
                     2: "forward"}
 
-    def __init__(self, obs_space_dims, action_space_dims, size,
-                 pos=None, direction=0, policy=None,
-                 verbose=False, load_maze=False, training=False,
+    def __init__(self, obs_space_dims, action_space_dims,
+                 maze_env="minigrid", policy=None,
+                 verbose=False, training=False,
                  load_weights_fn=None, network=True, path='.',
-                 learning_rate=1e-4, gamma=0.95, buffer_size=None,
+                 learning_rate=1e-4, discount_factor=0.95, buffer_size=None,
                  **kwargs):
-
         if kwargs:
             print("Agent init: unused kwargs:", kwargs)
 
         self.path = path
 
-        if pos is None:
-            pos = np.array([size // 2, size // 2])
+        self.maze_env = maze_env
 
-        self.pos = pos  # never used
-        self.direction = direction  # never used
+        self.obs_space_dims = obs_space_dims
+
+        if isinstance(self.obs_space_dims, int):
+            self.obs_space_dims = (self.obs_space_dims,)
 
         if buffer_size is None:
             buffer_size = 1
 
-        self.buffer = torch.zeros((1, buffer_size, obs_space_dims * 4))
+        self.buffer = torch.zeros((1, buffer_size, *self.obs_space_dims))
 
-        self.policies = {"random": self.random_policy}
-
-        self.maze = MazeGrid(size)
-
-        if load_maze:
-            self.policies["input"] = self.input_policy
-            self.policies["greedy"] = self.greedy_bfs_policy
-            self.policies["left"] = self.keep_on_left
+        self.policies = {"random": self.random_policy,
+                         "input": self.input_policy}
 
         self.training = training
         if network:
             # Hyperparameters
             self.learning_rate = learning_rate  # Learning rate for policy optimization
-            self.gamma = gamma  # Discount factor
+            self.gamma = discount_factor  # Discount factor
             self.eps = 1e-6  # small number for mathematical stability
 
             self.log_probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
-            self.net = PolicyNetwork(obs_space_dims*buffer_size*4, action_space_dims)
+            self.net = PolicyNetwork(self.buffer.shape, action_space_dims)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -176,12 +196,12 @@ class Agent:
         self.actions_to_do = []
 
     def save_weights(self, weights_fn):
-        fn = os.path.join(self.path, "runs_minigrid/weights", weights_fn)
+        fn = os.path.join(self.path, f"runs_{self.maze_env}/weights", weights_fn)
         torch.save(self.net.state_dict(), fn)
         return fn
 
     def load_weights(self, load_weights_fn):
-        fn = os.path.join(self.path, "runs_minigrid/weights", load_weights_fn)
+        fn = os.path.join(self.path, f"runs_{self.maze_env}/weights", load_weights_fn)
         self.net.load_state_dict(torch.load(fn))
         print("Loaded model weights from", fn)
 
@@ -201,68 +221,29 @@ class Agent:
         """
         0: left     1: right     2: forward
         """
-        self.maze.update(observation)
+        assert tuple(observation.shape) == tuple(self.obs_space_dims), f"observation shape {observation.shape}, " \
+                                                         f"expected {self.obs_space_dims}"
+
+        self.buffer = np.roll(self.buffer, 1, axis=1)
+        self.buffer[0, 0] = observation
+
+        state = self.buffer
 
         if self.actions_to_do:
             action = self.actions_to_do.pop()
         else:
             if self.default_policy is not None:
-                action = self.policies[self.default_policy](observation)
+                policy = self.policies[self.default_policy]
             else:
-                action = self.network_policy(observation)
-                # action = self.greedy_bfs_policy()
-                # action = self.keep_on_left()
-                # action = self.input_policy()
-                # action = self.random_policy()
+                policy = self.network_policy
+            action = policy(state)
 
-        if action == 0:
-            self.maze.left()
-        elif action == 1:
-            self.maze.right()
-        elif action == 2:
-            self.maze.forward()
-        else:
+        if action not in [0, 1, 2]:
             print(f"Unknown action: {action}")
 
         if self.verbose:
             print(self.action_space[action])
         return action
-
-    def network_policy(self, state: np.ndarray, get_dist=False) -> int:
-        """Returns an action, conditioned on the policy and observation.
-        
-        Args:
-            state: Observation from the environment
-            get_dist: if True, returns the distribution instead of sampling from it
-
-        Returns:
-            action: Action to be performed
-        """
-        objects = [self.maze.UNKNOWN, self.maze.EMPTY,
-                   self.maze.WALL, self.maze.GOAL]
-
-        image = np.array([[state == i for i in objects]], dtype=float)
-
-        self.buffer = np.roll(self.buffer, 1, axis=1)
-        self.buffer[0,0] = image.flatten()
-
-        obs = torch.tensor(self.buffer)
-
-        # returns probability of taking each action
-        distrib = self.net(obs).squeeze()
-        # use squeeze() only if batch of 1
-        # TODO: do we always have a batch of 1?
-
-        if get_dist:
-            return distrib.detach().numpy()
-
-        action = distrib.multinomial(num_samples=1)
-        action = action.numpy()
-
-        log_prob = torch.log(distrib[action])
-        self.log_probs.append(log_prob)
-
-        return int(action)
 
     def compute_loss(self):
         running_g = 0
@@ -298,10 +279,35 @@ class Agent:
         self.rewards = []
 
     def random_policy(self, observation=None):
-        if self.maze.can_move_forward():
-            return np.random.randint(3)
-        else:
-            return np.random.randint(2)
+        return np.random.randint(3)
+
+    def network_policy(self, state: np.ndarray, get_dist=False) -> int:
+        """Returns an action, conditioned on the policy and observation.
+
+                Args:
+                    state: Observation from the environment
+                    get_dist: if True, returns the distribution instead of sampling from it
+
+                Returns:
+                    action: Action to be performed
+                """
+        state = torch.tensor(state)
+
+        # returns probability of taking each action
+        distrib = self.net(state).squeeze()
+        # use squeeze() only if batch of 1
+        # TODO: do we always have a batch of 1?
+
+        if get_dist:
+            return distrib.detach().numpy()
+
+        action = distrib.multinomial(num_samples=1)
+        action = action.numpy()
+
+        log_prob = torch.log(distrib[action])
+        self.log_probs.append(log_prob)
+
+        return int(action)
 
     def input_policy(self, observation=None):
         a = input("Action? ")
@@ -310,6 +316,35 @@ class Agent:
         else:
             print("Wrong input. Options are: 0, 1 or 2")
             return self.input_policy()
+
+
+class MiniGridAgent(Agent):
+    def __init__(self, obs_space_dims, action_space_dims, size,
+                 pos=None, direction=0,
+                 load_maze=None,
+                 *args, **kwargs):
+
+        super().__init__(obs_space_dims*4, action_space_dims,
+                         *args, **kwargs)
+
+        if pos is None:
+            pos = np.array([size // 2, size // 2])
+
+        self.pos = pos  # never used
+        self.direction = direction  # never used
+
+        self.maze = MazeGrid(size)
+
+        if load_maze:
+            self.policies["greedy"] = self.greedy_bfs_policy
+            self.policies["left"] = self.keep_on_left
+
+    # override
+    def random_policy(self, observation=None):
+        if self.maze.can_move_forward():
+            return np.random.randint(3)
+        else:
+            return np.random.randint(2)
 
     def greedy_bfs_policy(self, observation=None):
         """
@@ -395,3 +430,29 @@ class Agent:
         self.actions_to_do += neighs[0][1]
 
         return self.actions_to_do.pop()
+
+    # override
+    def policy(self, observation):
+        objects = [self.maze.UNKNOWN, self.maze.EMPTY,
+                   self.maze.WALL, self.maze.GOAL]
+
+        image = np.array([[observation == i for i in objects]], dtype=float)
+
+        action = super().policy(image.flatten())
+
+        if action == 0:
+            self.maze.left()
+        elif action == 1:
+            self.maze.right()
+        elif action == 2:
+            self.maze.forward()
+
+        return action
+
+class MiniWorldAgent(Agent):
+    def __init__(self, *args, **kwargs):
+
+
+        super().__init__(*args, **kwargs)
+
+

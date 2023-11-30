@@ -16,7 +16,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from minigrid_utilities.training import initialize_training, fine_tune_agent
+from minigrid_utilities.training import initialize_training, fine_tune_agent, run_agent
 
 
 def main(render_mode=None):
@@ -78,12 +78,15 @@ def main(render_mode=None):
     rewards_per_maze = np.zeros((1, num_episodes_fine_tune))
 
     print(f"-- Maze seed {maze_seed} --")
+    env.reset(maze_seed=maze_seed)
 
-    stats = fine_tune_agent(agent, env, maze_seed=maze_seed,
-                            num_episodes=num_episodes_fine_tune,
-                            max_num_step=max_num_step,
-                            step_print=step_print,
-                            save_weights_fn=ft_save_weights_fn)
+    stats = run_agent(agent, env, num_episodes=num_episodes_fine_tune,
+                      max_num_step = max_num_step,
+                      change_maze_at_each_episode=False,
+                      training=True,
+                      step_print=step_print,
+                      save_weights_fn=ft_save_weights_fn)
+
     rewards_per_maze[0] = stats["reward_over_episodes"]
 
     # Plot to see how fast it converges with one agnostic method or another
