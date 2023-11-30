@@ -15,7 +15,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.environment import MiniGridMazeEnv
 from minigrid_utilities.policymaker import Agent
 
 from minigrid_utilities.training import run_agent, initialize_training
@@ -42,11 +42,11 @@ def main(render_mode=None):
     obs_space_dims = 49
     action_space_dims = 3
 
-    env = MazeEnv(render_mode=render_mode,
-                  size=size,
-                  maze_type="prims",  # "dungeon"
-                  maze_seed=maze_seed,
-                  )
+    env = MiniGridMazeEnv(render_mode=render_mode,
+                          size=size,
+                          maze_gen_algo="prims",  # "dungeon"
+                          maze_seed=maze_seed,
+                          )
 
     agent = Agent(obs_space_dims, action_space_dims,
                   size=env.size,

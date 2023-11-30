@@ -4,42 +4,79 @@ from copy import deepcopy
 import numpy as np
 import torch
 
-from minigrid_utilities.environment import MazeEnv
-from minigrid_utilities.policymaker import Agent
+from minigrid_utilities.environment import MiniGridMazeEnv, MiniWorldMazeEnv
+from minigrid_utilities.policymaker import Agent, MiniGridAgent, MiniWorldAgent
+
+import gymnasium as gym
+import miniworld
+
+from utilities.wrappers import WarpFrame, PyTorchFrame
 
 
 def initialize_training(obs_space_dims,
                         action_space_dims,
                         size,
+                        maze_env=None,
                         load_weights_fn=None,
                         render_mode=None,
                         learning_rate=None,
                         reward_new_cell=None,
-                        maze_type=None,
+                        maze_gen_algo=None,
                         buffer_size=None,
-                        **kwargs):
+                        discount_factor=None,
+                        **agent_kwargs):
+    if maze_env is None:
+        maze_env = "minigrid"
+
     # TODO: not sure if it is good practice to play around with kwargs
     if learning_rate is not None:
-        kwargs["learning_rate"] = learning_rate
+        agent_kwargs["learning_rate"] = learning_rate
     if buffer_size is not None:
-        kwargs["buffer_size"] = buffer_size
+        agent_kwargs["buffer_size"] = buffer_size
+    if discount_factor is not None:
+        agent_kwargs["discount_factor"] = discount_factor
 
-    agent = Agent(obs_space_dims, action_space_dims,
+    env_kwargs = dict()
+    if reward_new_cell is not None:
+        env_kwargs["reward_new_cell"] = reward_new_cell
+    if maze_gen_algo is not None:
+        env_kwargs["maze_gen_algo"] = maze_gen_algo
+
+    if maze_env.lower() == "minigrid":
+        agent = MiniGridAgent(obs_space_dims, action_space_dims,
                   size=size,
+                  maze_env=maze_env,
                   load_maze=False,
                   training=True,
                   load_weights_fn=load_weights_fn,
-                  **kwargs
+                  **agent_kwargs
                   )
-    kwargs = dict()
-    if reward_new_cell is not None:
-        kwargs["reward_new_cell"] = reward_new_cell
-    if maze_type is not None:
-        kwargs["maze_type"] = maze_type
+        env = MiniGridMazeEnv(render_mode=render_mode,
+                              size=size,
+                              **env_kwargs)
+    elif maze_env.lower() == "miniworld":
+        agent = MiniWorldAgent(obs_space_dims, action_space_dims,
+                              maze_env=maze_env,
+                              load_maze=False,
+                              training=True,
+                              load_weights_fn=load_weights_fn,
+                              **agent_kwargs
+                              )
 
-    env = MazeEnv(render_mode=render_mode,
-                  size=size,
-                  **kwargs)
+        env = gym.make("MiniWorld-Maze-v0",
+                       num_rows=3,
+                       num_cols=3,
+                       room_size=2,
+                       render_mode='top',
+                       view='top')
+        env = PyTorchFrame(env)
+        print("initialized environment...")
+
+        env = MiniWorldMazeEnv(render_mode=render_mode,
+                               size=size,
+                               **env_kwargs)
+    else:
+        raise NameError
 
     return agent, env
 
@@ -103,14 +140,13 @@ def fine_tune_agent(agent, env, maze_seed,
 
 
 def run_episode(agent, env, max_num_step):
-    observation = env.gen_obs().get('image')[:, :, 0]
+    observation = env.gen_obs()
 
     ep_reward = 0
     for i in range(max_num_step):
         action = agent.policy(observation)
 
         observation, reward, terminated, truncated, info = env.step(action)
-        observation = observation.get('image')[:, :, 0]
 
         agent.rewards.append(reward)
         ep_reward += reward
