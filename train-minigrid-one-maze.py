@@ -27,7 +27,7 @@ def main(render_mode=None):
     # num_batches = num_episodes // (num_episodes_per_maze * batch_size)
     num_episodes_fine_tune = 1000
 
-    max_num_step = 150
+    max_num_step = 100
 
     step_print = 100
     window_plot = 10 #step_print
@@ -57,7 +57,7 @@ def main(render_mode=None):
     load_weights_fn = ft_save_weights_fn
 
 
-    obs_space_dims = 49
+    obs_space_dims = (7,7)
     hidden_space_dims = [16, 16]
     action_space_dims = 3
     # TODO: use model_dims to define the NN for the agent policy. or not. idk
