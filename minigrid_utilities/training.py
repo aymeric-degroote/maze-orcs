@@ -63,15 +63,6 @@ def initialize_training(obs_space_dims,
                               **agent_kwargs
                               )
 
-        env = gym.make("MiniWorld-Maze-v0",
-                       num_rows=3,
-                       num_cols=3,
-                       room_size=2,
-                       render_mode='top',
-                       view='top')
-        env = PyTorchFrame(env)
-        print("initialized environment...")
-
         env = MiniWorldMazeEnv(render_mode=render_mode,
                                size=size,
                                **env_kwargs)
@@ -178,8 +169,14 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
             if batch_size is None or (ep_id + 1) % batch_size == 0:
                 agent.update()
 
-        _, agent_pos_seen, nb_actions = env.get_stats()
-        nb_cells_seen = len(agent_pos_seen)
+        env_stats = env.get_stats()
+        agent_pos_seen = env_stats.get("agent_pos_seen")
+        nb_actions = env_stats.get("nb_actions")
+
+        if agent_pos_seen:
+            nb_cells_seen = len(agent_pos_seen)
+        else:
+            nb_cells_seen = 0
         stats["nb_cells_seen_over_episodes"].append(nb_cells_seen)
         stats["nb_actions_over_episodes"].append(nb_actions)
 
