@@ -170,6 +170,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             maze_seed=None,
             maze_type="dungeon",
             reward_new_cell=0.0,
+            reward_closer_point=0.0,
             **kwargs,
     ):
         #self.size = size
@@ -180,7 +181,10 @@ class MiniWorldMazeEnv(MiniWorldMaze):
 
         self.total_reward = 0
         self.nb_actions = 0
+        self.agent_pos_seen = set()
         self.reward_new_cell = reward_new_cell
+        self.best_dist = 1e8
+        self.reward_closer_point = reward_closer_point
 
         super().__init__(#"MiniWorld-Maze-v0",
                          num_rows=3,
@@ -192,9 +196,14 @@ class MiniWorldMazeEnv(MiniWorldMaze):
     def step(self, *args, **kwargs):
         observation, reward, terminated, truncated, info = super().step(*args, **kwargs)
 
-        #if self.agent_pos not in self.agent_pos_seen:
-        #    reward += self.reward_new_cell
-        #    self.agent_pos_seen.add(self.agent_pos)
+        if tuple(self.agent.pos) not in self.agent_pos_seen:
+            reward += self.reward_new_cell
+            self.agent_pos_seen.add(tuple(self.agent.pos))
+
+        dist = np.linalg.norm(self.agent.pos - self.box.pos)
+        if dist < self.best_dist:
+            self.best_dist = dist
+            reward += self.reward_closer_point
 
         self.nb_actions += 1
         self.total_reward += reward
@@ -206,6 +215,8 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             self.maze_seed = maze_seed
 
         output = super().reset(*args, **kwargs)
+
+        # TODO: the seed has no effect here
 
         #self._gen_positions()
 
