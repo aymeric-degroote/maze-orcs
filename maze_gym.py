@@ -9,7 +9,7 @@ TODO: remove this file that is pretty useless
 
 from __future__ import annotations
 
-from minigrid_utilities.environment import MazeEnv
+from minigrid_utilities.environment import MiniGridMazeEnv
 from minigrid_utilities.policymaker import Agent
 
 
@@ -18,9 +18,9 @@ def main():
     num_episodes = 2
     max_num_step = 1000
 
-    env = MazeEnv(render_mode="human",
-                  maze_type="dungeon" #"prims"
-                 )
+    env = MiniGridMazeEnv(render_mode="human",
+                          maze_gen_algo="dungeon"  #"prims"
+                          )
 
     observation, info = env.reset(seed=0)
     observation = observation.get('image')[:,:,0]

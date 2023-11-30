@@ -76,7 +76,9 @@ for t in range(100000):
         # Explore
         action = env.action_space.sample()
 
-    next_state, reward, done, truncated, info = env.step(action)
+    next_state, reward, terminated, truncated, info = env.step(action)
+    done = terminated or truncated
+
     agent.memory.add(state, action, reward, next_state, float(done))
     state = next_state
 
