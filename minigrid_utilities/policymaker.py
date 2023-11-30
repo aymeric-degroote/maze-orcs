@@ -60,7 +60,7 @@ class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
     def __init__(self, obs_space_dims, action_space_dims: int,
-                 maze_env="minigrid", hidden_space_dims=None):
+                 maze_env, hidden_space_dims=None):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
         Args:
@@ -94,23 +94,23 @@ class PolicyNetwork(nn.Module):
             # TODO: the hyperparameters are arbitrary
 
             self.net = nn.Sequential(
-                # size (60, 80, 3)
+                # size (3, 60, 80)
                 nn.Conv2d(in_channels=3, out_channels=16,
                           kernel_size=(5,5), stride=(5,5)),
                 nn.ReLU(),
-                # size (12, 16, 16)
+                # size (16, 12, 16)
                 nn.Conv2d(in_channels=16, out_channels=32,
                           kernel_size=(4,4), stride=(4,4)),
                 nn.ReLU(),
-                # size (3, 4, 32)
-                nn.Flatten(),
-                # size (3*4*32) = (384)
+                # size (32, 3, 4)
+                nn.Flatten(start_dim=0),
+                # size (32*3*4) = (384)
                 nn.Linear(384, 32),
                 nn.Tanh(),
                 nn.Linear(32, 16),
                 nn.Tanh(),
                 nn.Linear(16, action_space_dims),
-                nn.Softmax(dim=1)
+                nn.Softmax(dim=0)
             )
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
@@ -168,7 +168,8 @@ class Agent:
             self.log_probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
-            self.net = PolicyNetwork(self.buffer.shape, action_space_dims)
+            self.net = PolicyNetwork(self.buffer.shape, action_space_dims,
+                                     maze_env=maze_env)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -291,7 +292,7 @@ class Agent:
                 Returns:
                     action: Action to be performed
                 """
-        state = torch.tensor(state)
+        state = torch.tensor(state).squeeze().permute(2, 0, 1)
 
         # returns probability of taking each action
         distrib = self.net(state).squeeze()
@@ -451,7 +452,6 @@ class MiniGridAgent(Agent):
 
 class MiniWorldAgent(Agent):
     def __init__(self, *args, **kwargs):
-
 
         super().__init__(*args, **kwargs)
 
