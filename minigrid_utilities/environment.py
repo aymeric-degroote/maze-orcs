@@ -195,15 +195,20 @@ class MiniWorldMazeEnv(MiniWorldMaze):
 
     def step(self, *args, **kwargs):
         observation, reward, terminated, truncated, info = super().step(*args, **kwargs)
+        # TODO: separate reward and custom_reward so we can track progress more easily
 
+        custom_reward = 0
         if tuple(self.agent.pos) not in self.agent_pos_seen:
-            reward += self.reward_new_cell
+            custom_reward += self.reward_new_cell
             self.agent_pos_seen.add(tuple(self.agent.pos))
 
-        dist = np.linalg.norm(self.agent.pos - self.box.pos)
-        if dist < self.best_dist:
-            self.best_dist = dist
-            reward += self.reward_closer_point
+        if self.reward_closer_point > 0:
+            dist = np.linalg.norm(self.agent.pos - self.box.pos)
+            if dist < self.best_dist:
+                self.best_dist = dist
+                custom_reward += self.reward_closer_point
+
+        reward += custom_reward
 
         self.nb_actions += 1
         self.total_reward += reward

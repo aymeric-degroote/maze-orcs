@@ -40,8 +40,6 @@ def initialize_training(obs_space_dims,
     env_kwargs = dict()
     if reward_new_cell is not None:
         env_kwargs["reward_new_cell"] = reward_new_cell
-    if reward_closer_point is not None:
-        env_kwargs["reward_closer_point"] = reward_closer_point
     if maze_gen_algo is not None:
         env_kwargs["maze_gen_algo"] = maze_gen_algo
 
@@ -58,6 +56,9 @@ def initialize_training(obs_space_dims,
                               size=size,
                               **env_kwargs)
     elif maze_env.lower() == "miniworld":
+        if reward_closer_point is not None:
+            env_kwargs["reward_closer_point"] = reward_closer_point
+
         agent = MiniWorldAgent(obs_space_dims, action_space_dims,
                               maze_env=maze_env,
                               load_maze=False,

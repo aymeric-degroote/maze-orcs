@@ -20,6 +20,11 @@ class MazeGrid:
         self.center = (size // 2, size // 2)
         self.grid[self.center] = self.EMPTY
 
+    def reset(self):
+        self.grid *= self.UNKNOWN  # = 0
+        self.center = (self.size // 2, self.size // 2)
+        self.grid[self.center] = self.EMPTY
+
     def update(self, observation):
         """
         observation is a 7x7 grid. Each point has 3 coordinates:
@@ -60,7 +65,7 @@ class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
     def __init__(self, obs_space_dims, action_space_dims: int,
-                 maze_env, hidden_space_dims=None):
+                 maze_env, hidden_space_dims=None, nn_id=None):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
         Args:
@@ -76,7 +81,7 @@ class PolicyNetwork(nn.Module):
             #  check in the literature what kind of model architecture they use
 
             hidden_space_dims = [64, 32]
-            model_dims = [np.prod(obs_space_dims)] + hidden_space_dims + [action_space_dims]
+            model_dims = [np.prod(obs_space_dims)*4] + hidden_space_dims + [action_space_dims]
 
             print("model dims", model_dims)
             layers = [nn.Flatten()]
@@ -91,27 +96,58 @@ class PolicyNetwork(nn.Module):
             # obs_space_dims is (60,80, 3)
             # action_space_dims is (3)
 
+            if nn_id is None:
+                nn_id = "384"
+
             # TODO: the hyperparameters are arbitrary
 
-            self.net = nn.Sequential(
-                # size (3, 60, 80)
-                nn.Conv2d(in_channels=3, out_channels=16,
-                          kernel_size=(5,5), stride=(5,5)),
-                nn.ReLU(),
-                # size (16, 12, 16)
-                nn.Conv2d(in_channels=16, out_channels=32,
-                          kernel_size=(4,4), stride=(4,4)),
-                nn.ReLU(),
-                # size (32, 3, 4)
-                nn.Flatten(start_dim=0),
-                # size (32*3*4) = (384)
-                nn.Linear(384, 32),
-                nn.Tanh(),
-                nn.Linear(32, 16),
-                nn.Tanh(),
-                nn.Linear(16, action_space_dims),
-                nn.Softmax(dim=0)
-            )
+            if nn_id == "3072":
+                # h' = (h-kernel)/stride + 1
+                self.net = nn.Sequential(
+                    # size (3, 60, 80)
+                    nn.Conv2d(in_channels=3, out_channels=16,
+                              kernel_size=(6,6), stride=(2,2)),
+                    nn.ReLU(),
+                    # size (16, 28, 38)
+                    nn.Conv2d(in_channels=16, out_channels=32,
+                              kernel_size=(4,4), stride=(2,2)),
+                    nn.ReLU(),
+                    # size (64, 13, 18)
+                    nn.Conv2d(in_channels=32, out_channels=64,
+                              kernel_size=(3,4), stride=(2,2)),
+                    nn.ReLU(),
+                    # size (64, 6, 8)
+                    nn.Flatten(start_dim=0),
+                    # size (64*6*8) = (3072)
+                    nn.Linear(3072, 128),
+                    nn.Tanh(),
+                    nn.Linear(128, 16),
+                    nn.Tanh(),
+                    nn.Linear(16, action_space_dims),
+                    nn.Softmax(dim=0)
+                )
+            elif nn_id == "384":
+                # h' = (h-kernel)/stride + 1
+                self.net = nn.Sequential(
+                    # size (3, 60, 80)
+                    nn.Conv2d(in_channels=3, out_channels=16,
+                              kernel_size=(5,5), stride=(5,5)),
+                    nn.ReLU(),
+                    # size (16, 12, 16)
+                    nn.Conv2d(in_channels=16, out_channels=32,
+                              kernel_size=(4,4), stride=(4,4)),
+                    nn.ReLU(),
+                    # size (32, 3, 4)
+                    nn.Flatten(start_dim=0),
+                    # size (32*3*4) = (384)
+                    nn.Linear(384, 32),
+                    nn.Tanh(),
+                    nn.Linear(32, 16),
+                    nn.Tanh(),
+                    nn.Linear(16, action_space_dims),
+                    nn.Softmax(dim=0)
+                )
+
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
@@ -135,7 +171,8 @@ class Agent:
     def __init__(self, obs_space_dims, action_space_dims,
                  maze_env="minigrid", policy=None,
                  verbose=False, training=False,
-                 load_weights_fn=None, network=True, path='.',
+                 load_weights_fn=None, network=True,
+                 nn_id=None, path='.',
                  learning_rate=1e-4, discount_factor=0.95, buffer_size=None,
                  **kwargs):
         if kwargs:
@@ -150,13 +187,16 @@ class Agent:
         if isinstance(self.obs_space_dims, int):
             self.obs_space_dims = (self.obs_space_dims,)
 
-        if buffer_size is None:
-            buffer_size = 1
+        if buffer_size is not None:
+            self.buffer = torch.zeros((1, buffer_size, *self.obs_space_dims))
+            self.state_shape = self.buffer.shape
+        else:
+            self.state_shape = self.obs_space_dims
+        if not hasattr(self, "policies"):
+            self.policies = {}
 
-        self.buffer = torch.zeros((1, buffer_size, *self.obs_space_dims))
-
-        self.policies = {"random": self.random_policy,
-                         "input": self.input_policy}
+        self.policies["random"] = self.random_policy
+        self.policies["input"] = self.input_policy
 
         self.training = training
         if network:
@@ -168,8 +208,9 @@ class Agent:
             self.log_probs = []  # Stores probability values of the sampled action
             self.rewards = []  # Stores the corresponding rewards
 
-            self.net = PolicyNetwork(self.buffer.shape, action_space_dims,
-                                     maze_env=maze_env)
+            print('nn_id', nn_id)
+            self.net = PolicyNetwork(self.state_shape, action_space_dims,
+                                     maze_env=maze_env, nn_id=nn_id)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -184,6 +225,9 @@ class Agent:
                                                lr=self.learning_rate)
 
             self.policies["network"] = self.network_policy
+
+        print('policy', policy)
+        print("keys", self.policies.keys())
 
         if policy is not None and policy not in self.policies.keys():
             policy = None
@@ -225,10 +269,13 @@ class Agent:
         assert tuple(observation.shape) == tuple(self.obs_space_dims), f"observation shape {observation.shape}, " \
                                                          f"expected {self.obs_space_dims}"
 
-        self.buffer = np.roll(self.buffer, 1, axis=1)
-        self.buffer[0, 0] = observation
+        if hasattr(self, "buffer"):
+            self.buffer = np.roll(self.buffer, 1, axis=1)
+            self.buffer[0, 0] = observation
 
-        state = self.buffer
+            state = self.buffer
+        else:
+            state = observation
 
         if self.actions_to_do:
             action = self.actions_to_do.pop()
@@ -292,7 +339,7 @@ class Agent:
                 Returns:
                     action: Action to be performed
                 """
-        state = torch.tensor(state).squeeze().permute(2, 0, 1)
+        state = torch.tensor(state)
 
         # returns probability of taking each action
         distrib = self.net(state).squeeze()
@@ -310,7 +357,7 @@ class Agent:
 
         return int(action)
 
-    def input_policy(self, observation=None):
+    def input_policy(self, *args, **kwargs):
         a = input("Action? ")
         if a in "012":
             return int(a)
@@ -325,7 +372,13 @@ class MiniGridAgent(Agent):
                  load_maze=None,
                  *args, **kwargs):
 
-        super().__init__(obs_space_dims*4, action_space_dims,
+        if load_maze:
+            self.policies = {
+                "greedy": self.greedy_bfs_policy,
+                "left": self.keep_on_left
+            }
+
+        super().__init__(obs_space_dims, action_space_dims,
                          *args, **kwargs)
 
         if pos is None:
@@ -335,10 +388,6 @@ class MiniGridAgent(Agent):
         self.direction = direction  # never used
 
         self.maze = MazeGrid(size)
-
-        if load_maze:
-            self.policies["greedy"] = self.greedy_bfs_policy
-            self.policies["left"] = self.keep_on_left
 
     # override
     def random_policy(self, observation=None):
@@ -351,6 +400,7 @@ class MiniGridAgent(Agent):
         """
         Not efficient at all because we run the algorithm every time
         """
+        self.maze.update(observation)
 
         def neighbors(cell):
             neighs = []
@@ -388,12 +438,8 @@ class MiniGridAgent(Agent):
                     break
 
         if target is None:
-            # TODO: I haven't been able to reproduce the bug but it happened before
-            print("BFS couldn't find goal or unknown cell")
-            print(self.maze.grid)
-            print(previous_cell)
-            return 42
-            # return np.random.randint(3)
+            self.maze.reset()
+            return np.random.randint(3)
 
         intermediate_cell, actions = previous_cell[target]
         while intermediate_cell != self.maze.center:
@@ -434,12 +480,7 @@ class MiniGridAgent(Agent):
 
     # override
     def policy(self, observation):
-        objects = [self.maze.UNKNOWN, self.maze.EMPTY,
-                   self.maze.WALL, self.maze.GOAL]
-
-        image = np.array([[observation == i for i in objects]], dtype=float)
-
-        action = super().policy(image.flatten())
+        action = super().policy(observation)
 
         if action == 0:
             self.maze.left()
@@ -450,9 +491,27 @@ class MiniGridAgent(Agent):
 
         return action
 
+    # override
+    def network_policy(self, state, *args, **kwargs):
+        objects = [self.maze.UNKNOWN, self.maze.EMPTY,
+                   self.maze.WALL, self.maze.GOAL]
+
+        state = np.array([[state == i for i in objects]], dtype=float)
+
+        return super().network_policy(state, *args, **kwargs)
+
+
 class MiniWorldAgent(Agent):
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
 
+    # override
+    def network_policy(self, state, *args, **kwargs):
+        if self.maze_env == "miniworld":
+            state = torch.tensor(state)
+            state = state.squeeze().permute(2, 0, 1)
+            # TODO: use numpy for squeeze and permute
+
+        return super().network_policy(state, *args, **kwargs)
 

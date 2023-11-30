@@ -24,27 +24,28 @@ from minigrid_utilities.training import initialize_training, fine_tune_agent, ru
 def main(render_mode=None):
 
     maze_env = "minigrid"
-    obs_space_dims = 49
+    obs_space_dims = (7,7)
     maze_env = "miniworld"
     obs_space_dims = (60, 80, 3)
 
-    num_episodes_fine_tune = 1000
+    num_episodes_fine_tune = 500
 
-    max_num_step = 120
+    max_num_step = 100
 
     step_print = 100
     window_plot = 10 #step_print
     size = 13
     learning_rate = 1e-4
     discount_factor = 0.9
-    reward_new_cell = 0.01
-    reward_closer_point = 0.01
+    reward_new_cell = 0.0 #1
+    reward_closer_point = 0.0 #1
 
     buffer_size = 1
 
     maze_seed = 3
     agnostic_method = "scratch"  #"batch"  # "maml"
-    run_id = 77
+    #run_id = 52; nn_id = "384"
+    run_id = 56; nn_id = "3072"
 
     if buffer_size is None:
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
@@ -74,7 +75,8 @@ def main(render_mode=None):
                                      buffer_size=buffer_size,
                                      reward_new_cell=reward_new_cell,
                                      reward_closer_point=reward_closer_point,
-                                     discount_factor=discount_factor)
+                                     discount_factor=discount_factor,
+                                     nn_id=nn_id)
 
     print("-- Training model --")
     rewards_per_maze = np.zeros((1, num_episodes_fine_tune))
