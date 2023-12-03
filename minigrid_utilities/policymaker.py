@@ -41,11 +41,11 @@ class MazeGrid:
         """
         observed_image = observation  # .get('image')[:,:,0]
         window = self.grid[self.center[0] - 6:self.center[0] + 1,
-                           self.center[1] - 3:self.center[1] + 4] * 1  # copy
+                 self.center[1] - 3:self.center[1] + 4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
 
         self.grid[self.center[0] - 6:self.center[0] + 1,
-                  self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
+        self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
 
     def can_move_forward(self):
         return self.grid[self.center[0] - 1, self.center[1]] == self.EMPTY
@@ -65,7 +65,8 @@ class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
     def __init__(self, obs_space_dims, action_space_dims: int,
-                 maze_env, hidden_space_dims=None, nn_id=None):
+                 maze_env, hidden_space_dims=None, nn_id=None,
+                 buffer_size=1):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
         Args:
@@ -81,13 +82,13 @@ class PolicyNetwork(nn.Module):
             #  check in the literature what kind of model architecture they use
 
             hidden_space_dims = [64, 32]
-            model_dims = [np.prod(obs_space_dims)*4] + hidden_space_dims + [action_space_dims]
+            model_dims = [np.prod(obs_space_dims) * 4] + hidden_space_dims + [action_space_dims]
 
             print("model dims", model_dims)
             layers = [nn.Flatten()]
 
-            for i in range(len(model_dims)-1):
-                layers.append(nn.Linear(model_dims[i], model_dims[i+1]))
+            for i in range(len(model_dims) - 1):
+                layers.append(nn.Linear(model_dims[i], model_dims[i + 1]))
                 layers.append(nn.Tanh())
 
             layers.append(nn.Softmax(dim=1))
@@ -99,22 +100,28 @@ class PolicyNetwork(nn.Module):
             if nn_id is None:
                 nn_id = "384"
 
+            # TODO: Add LSTM model
+
+            # TODO: if LSTM works, remove the buffer and keep track of the hidden state instead
+
+
+
             # TODO: the hyperparameters are arbitrary
 
             if nn_id == "3072":
                 # h' = (h-kernel)/stride + 1
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3, out_channels=16,
-                              kernel_size=(6,6), stride=(2,2)),
+                    nn.Conv2d(in_channels=3*buffer_size, out_channels=16,
+                              kernel_size=(6, 6), stride=(2, 2)),
                     nn.ReLU(),
                     # size (16, 28, 38)
                     nn.Conv2d(in_channels=16, out_channels=32,
-                              kernel_size=(4,4), stride=(2,2)),
+                              kernel_size=(4, 4), stride=(2, 2)),
                     nn.ReLU(),
                     # size (64, 13, 18)
                     nn.Conv2d(in_channels=32, out_channels=64,
-                              kernel_size=(3,4), stride=(2,2)),
+                              kernel_size=(3, 4), stride=(2, 2)),
                     nn.ReLU(),
                     # size (64, 6, 8)
                     nn.Flatten(start_dim=0),
@@ -131,11 +138,11 @@ class PolicyNetwork(nn.Module):
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
                     nn.Conv2d(in_channels=3, out_channels=16,
-                              kernel_size=(5,5), stride=(5,5)),
+                              kernel_size=(5, 5), stride=(5, 5)),
                     nn.ReLU(),
                     # size (16, 12, 16)
                     nn.Conv2d(in_channels=16, out_channels=32,
-                              kernel_size=(4,4), stride=(4,4)),
+                              kernel_size=(4, 4), stride=(4, 4)),
                     nn.ReLU(),
                     # size (32, 3, 4)
                     nn.Flatten(start_dim=0),
@@ -147,7 +154,6 @@ class PolicyNetwork(nn.Module):
                     nn.Linear(16, action_space_dims),
                     nn.Softmax(dim=0)
                 )
-
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
@@ -210,7 +216,8 @@ class Agent:
 
             print('nn_id', nn_id)
             self.net = PolicyNetwork(self.state_shape, action_space_dims,
-                                     maze_env=maze_env, nn_id=nn_id)
+                                     maze_env=maze_env, nn_id=nn_id,
+                                     buffer_size = buffer_size or 1)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -266,8 +273,8 @@ class Agent:
         """
         0: left     1: right     2: forward
         """
-        assert tuple(observation.shape) == tuple(self.obs_space_dims), f"observation shape {observation.shape}, " \
-                                                         f"expected {self.obs_space_dims}"
+        assert tuple(observation.shape) == tuple(self.obs_space_dims), \
+            f"observation shape {observation.shape}, expected {self.obs_space_dims}"
 
         if hasattr(self, "buffer"):
             self.buffer = np.roll(self.buffer, 1, axis=1)
@@ -503,15 +510,14 @@ class MiniGridAgent(Agent):
 
 class MiniWorldAgent(Agent):
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
 
     # override
     def network_policy(self, state, *args, **kwargs):
         if self.maze_env == "miniworld":
-            state = torch.tensor(state)
-            state = state.squeeze().permute(2, 0, 1)
-            # TODO: use numpy for squeeze and permute
+            state = torch.tensor(state)                         # (1, buffer_size, H, W, channels)
+            state = state.permute(0, 1, 4, 2, 3)                # (1, buffer_size, channels, H, W)
+            state = state.reshape(1, -1, *state.shape[-2:])     # (1, buffer_size * channels, H, W)
+            # TODO: use numpy instead of torch for squeeze and permute
 
         return super().network_policy(state, *args, **kwargs)
-
