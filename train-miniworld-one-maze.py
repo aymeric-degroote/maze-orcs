@@ -41,6 +41,7 @@ def main(render_mode=None):
     reward_closer_point = 0.01
 
     buffer_size = 1
+    memory = False
 
     maze_seed = 3
     agnostic_method = "scratch"  #"batch"  # "maml"
@@ -48,6 +49,9 @@ def main(render_mode=None):
     run_id = 56; nn_id = "3072"
     run_id = 72; nn_id = "384"; buffer_size=5
     run_id = 69; nn_id = "lstm"; buffer_size = 5
+    run_id = 77; nn_id = "lstm"; buffer_size = 1; memory = True
+
+    torch.autograd.set_detect_anomaly(True)
 
     if buffer_size is None:
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
@@ -78,7 +82,8 @@ def main(render_mode=None):
                                      reward_new_cell=reward_new_cell,
                                      reward_closer_point=reward_closer_point,
                                      discount_factor=discount_factor,
-                                     nn_id=nn_id)
+                                     nn_id=nn_id,
+                                     memory=memory)
 
     print("-- Training model --")
     rewards_per_maze = np.zeros((1, num_episodes_fine_tune))
@@ -92,7 +97,8 @@ def main(render_mode=None):
                       change_maze_at_each_episode=False,
                       training=True,
                       step_print=step_print,
-                      save_weights_fn=ft_save_weights_fn)
+                      save_weights_fn=ft_save_weights_fn,
+                      retain_graph=None or memory)
 
     rewards_per_maze[0] = stats["reward_over_episodes"]
 
