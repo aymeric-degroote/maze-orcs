@@ -36,7 +36,7 @@ def main(render_mode=None):
     window_plot = 10 #step_print
     size = 13
     learning_rate = 1e-4
-    discount_factor = 0.9
+    discount_factor = 0.95
     reward_new_cell = 0.01
     reward_closer_point = 0.01
 
@@ -51,7 +51,7 @@ def main(render_mode=None):
     run_id = 69; nn_id = "lstm"; buffer_size = 5
     run_id = 77; nn_id = "lstm"; buffer_size = 1; memory = True
 
-    torch.autograd.set_detect_anomaly(True)
+    #torch.autograd.set_detect_anomaly(True)
 
     if buffer_size is None:
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"

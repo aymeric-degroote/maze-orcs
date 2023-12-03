@@ -112,11 +112,14 @@ class PolicyNetwork(nn.Module):
 
             # TODO: all the hyperparameters are arbitrary for now, needs some fine tuning
 
-            # TODO: remove the buffer and keep track of the hidden state instead
             if self.nn_id == "lstm":
-                # input size: (1, buffer_size, channels, H, W)
-                # TODO: Should we use a max_pool layer?
 
+                # TODO: should define hidden_state_dims in function arguments
+                self.hidden_state_dims = 200
+                self.embedded_state_dims = 32
+                self.lstm_num_Layers = 3
+
+                # TODO: Should we use a max_pool layer at first?
                 self.embedding_net = nn.Sequential(
                     # size (3, 60, 80)
                     nn.Conv2d(in_channels=3, out_channels=16,
@@ -135,23 +138,25 @@ class PolicyNetwork(nn.Module):
                     # size (64*6*8) = (3072)
                     nn.Linear(3072, 128),
                     nn.Tanh(),
-                    nn.Linear(128, 16)
+                    nn.Linear(128, self.embedded_state_dims)
                 )
 
-                # TODO: should define hidden_state_dims somewhere else
-                self.hidden_state_dims = 16
-                self.lstm = nn.LSTM(input_size=16,
+                self.lstm = nn.LSTM(input_size= self.embedded_state_dims,
                                     hidden_size=self.hidden_state_dims,
-                                    num_layers=1,
+                                    num_layers=self.lstm_num_Layers,
                                     )
 
-                self.linear = nn.Linear(16, action_space_dims)
-                self.sigmoid = nn.Sigmoid()
+                self.action_net = nn.Sequential(
+                    nn.Linear(self.hidden_state_dims, 16),
+                    nn.Tanh(),
+                    nn.Linear(16, action_space_dims),
+                    nn.Sigmoid()
+                )
 
                 if self.memory:
-                    # no batch size
-                    self.hidden_state = [(torch.zeros(1, 1, self.hidden_state_dims),
-                                         torch.zeros(1, 1, self.hidden_state_dims))]
+                    # no batch size = 1
+                    self.hidden_state = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
+                    self.cell_output  = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
 
             elif self.nn_id == "3072":
                 # h' = (h-kernel)/stride + 1
@@ -225,50 +230,43 @@ class PolicyNetwork(nn.Module):
                 action_distribution = self.net(state.float())
 
             elif self.nn_id == "lstm":
-                if not self.memory:
-                    # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
+                # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
 
-                    # Get the dimensions
-                    # (1, buffer_size, channels, H, W)
-                    batch_size, buffer_size, num_channels, height, width = state.size()
+                # Get the dimensions
+                # (1, buffer_size, channels, H, W)
+                batch_size, buffer_size, num_channels, height, width = state.size()
 
-                    # Initialize Hidden State (short-term memory) and Cell Output (long-term memory)
-                    # TODO: merge hidden and cell in one state as I did for memory=True
-                    hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                    cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                    output = torch.zeros(batch_size, 1, 16)
+                if self.memory:
+                    observation = state[:, 0]
+                    embedded_obs = self.embedding_net(observation)
+                    embedded_obs = embedded_obs.reshape(batch_size, -1, self.embedded_state_dims)
+
+                    # found this line on a forum. don't know why it works, but it works!
+                    # I think it's making a copy basically
+                    hidden = self.hidden_state.data
+                    cell_input = self.cell_output.data
+
+                    output, (new_hidden_state, new_cell_output) = self.lstm(embedded_obs, (hidden, cell_input))
+
+                    self.hidden_state = new_hidden_state
+                    self.cell_output = new_cell_output
+
+                    #self.hidden_state = [new_hidden_state]
+
+                else:
+                    # Initialize Hidden State (short-term memory & long-term memory)
+                    hidden_state = (torch.zeros(batch_size, 1, self.hidden_state_dims),
+                                    torch.zeros(batch_size, 1, self.hidden_state_dims))
+
+                    output = torch.zeros(batch_size, 1, self.hidden_state_dims)
 
                     for frame in range(buffer_size):
                         observation = state[:, frame]
                         embedded_obs = self.embedding_net(observation)
-                        embedded_obs = embedded_obs.reshape(batch_size, -1, 16)
-                        output, (hidden_state, cell_output) = self.lstm(embedded_obs, (hidden_state, cell_output))
+                        embedded_obs = embedded_obs.reshape(batch_size, -1, self.embedded_state_dims)
+                        output, hidden_state = self.lstm(embedded_obs, hidden_state)
 
-                    output = self.linear(output)
-                    action_distribution = self.sigmoid(output)
-                else:
-                    # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
-
-                    # Get the dimensions
-                    # (1, 1, channels, H, W)
-                    batch_size, _, num_channels, height, width = state.size()
-
-                    observation = state[:, 0]
-                    embedded_obs = self.embedding_net(observation)
-                    embedded_obs = embedded_obs.reshape(batch_size, -1, 16)
-                    # new_hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                    # new_cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                    # output = torch.zeros(batch_size, 1, 16)
-
-                    # found this line on a forum. don't know why it works, but it works!
-                    # I think it's making a copy basically
-                    hidden = tuple([each.data for each in self.hidden_state[-1]])
-
-                    output, new_hidden_state = self.lstm(embedded_obs, hidden)
-                    self.hidden_state.append(new_hidden_state)
-
-                    output = self.linear(output)
-                    action_distribution = self.sigmoid(output)
+                action_distribution = self.action_net(output)
             else:
                 raise NameError("unknown nn_id")
 
