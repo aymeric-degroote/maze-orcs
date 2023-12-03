@@ -164,9 +164,9 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             num_rows=3,
             num_cols=3,
             room_size=2,
-            render_mode='human',  # 'top'
+            render_mode='human',
             view='top',
-            max_steps: int | None = None,
+            max_steps: int | None = 1000,
             maze_seed=None,
             maze_type="dungeon",
             reward_new_cell=0.0,
@@ -178,6 +178,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         self.maze_seed = maze_seed
 
         #self._gen_positions()
+        self.ui_render = render_mode == "human"
 
         self.total_reward = 0
         self.nb_actions = 0
@@ -186,11 +187,12 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         self.best_dist = 1e8
         self.reward_closer_point = reward_closer_point
 
-        super().__init__(#"MiniWorld-Maze-v0",
+        super().__init__(# "MiniWorld-Maze-v0",
                          num_rows=3,
                          num_cols=3,
+                         max_episode_steps=max_steps,
                          room_size=2,
-                         render_mode='human',  # 'top'
+                         render_mode='human',  # 'top',
                          view='top')
 
     def step(self, *args, **kwargs):
@@ -212,6 +214,9 @@ class MiniWorldMazeEnv(MiniWorldMaze):
 
         self.nb_actions += 1
         self.total_reward += reward
+
+        if self.ui_render:
+            self.render()
 
         return observation, reward, terminated, truncated, info
 

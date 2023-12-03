@@ -30,15 +30,15 @@ def main(render_mode=None):
 
     num_episodes_fine_tune = 500
 
-    max_num_step = 100
+    max_num_step = 1000
 
     step_print = 100
     window_plot = 10 #step_print
     size = 13
     learning_rate = 1e-4
     discount_factor = 0.9
-    reward_new_cell = 0.0 #1
-    reward_closer_point = 0.0 #1
+    reward_new_cell = 0.01
+    reward_closer_point = 0.01
 
     buffer_size = 1
 
@@ -46,6 +46,7 @@ def main(render_mode=None):
     agnostic_method = "scratch"  #"batch"  # "maml"
     #run_id = 52; nn_id = "384"
     run_id = 56; nn_id = "3072"
+    #run_id = 72; nn_id = "3072"; buffer_size=5
 
     if buffer_size is None:
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
