@@ -65,7 +65,10 @@ class PolicyNetwork(nn.Module):
     """Parametrized Policy Network."""
 
     def __init__(self, obs_space_dims, action_space_dims: int,
-                 maze_env, hidden_space_dims=None, nn_id=None,
+                 maze_env,
+                 hidden_space_dims=None,   # For Dense NN
+                 nn_id=None,
+                 hidden_state_dims=None,  # For LSTM
                  buffer_size=1):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
@@ -77,9 +80,12 @@ class PolicyNetwork(nn.Module):
 
         print("Model input size", obs_space_dims)
 
-        if maze_env == "minigrid":
-            # TODO: this is a very basic NN
-            #  check in the literature what kind of model architecture they use
+        self.maze_env = maze_env
+        self.hidden_state_dims = hidden_state_dims
+
+        if self.maze_env == "minigrid":
+            # this is a very basic NN, check in the literature what kind of model architecture
+            # they use if you want to improve it
 
             hidden_space_dims = [64, 32]
             model_dims = [np.prod(obs_space_dims) * 4] + hidden_space_dims + [action_space_dims]
@@ -100,6 +106,8 @@ class PolicyNetwork(nn.Module):
             if nn_id is None:
                 nn_id = "384"
 
+            self.nn_id = nn_id
+
             # TODO: Add LSTM model
 
             # TODO: if LSTM works, remove the buffer and keep track of the hidden state instead
@@ -108,7 +116,49 @@ class PolicyNetwork(nn.Module):
 
             # TODO: the hyperparameters are arbitrary
 
-            if nn_id == "3072":
+            if self.nn_id == "lstm":
+                # input size: (1, buffer_size, channels, H, W)
+                # conv formula: h' = (h-kernel)/stride + 1
+
+                # TODO: Should we use a max_pool layer?
+
+                self.embedding_net = nn.Sequential(
+                    # size (3, 60, 80)
+                    nn.Conv2d(in_channels=3, out_channels=16,
+                              kernel_size=(6, 6), stride=(2, 2)),
+                    nn.ReLU(),
+                    # size (16, 28, 38)
+                    nn.Conv2d(in_channels=16, out_channels=32,
+                              kernel_size=(4, 4), stride=(2, 2)),
+                    nn.ReLU(),
+                    # size (64, 13, 18)
+                    nn.Conv2d(in_channels=32, out_channels=64,
+                              kernel_size=(3, 4), stride=(2, 2)),
+                    nn.ReLU(),
+                    # size (64, 6, 8)
+                    nn.Flatten(start_dim=0),
+                    # size (64*6*8) = (3072)
+                    nn.Linear(3072, 128),
+                    nn.Tanh(),
+                    nn.Linear(128, 16)
+                )
+
+                # TODO: should define hidden_state_dims somewhere else
+                self.hidden_state_dims = 16
+                print('he he')
+                self.lstm = nn.LSTM(input_size=16,
+                                    hidden_size=self.hidden_state_dims,
+                                    num_layers=1,
+                )
+                print('oh oh')
+
+                self.linear = nn.Linear(16, action_space_dims)
+
+                self.sigmoid = nn.Sigmoid()
+
+
+
+            elif self.nn_id == "3072":
                 # h' = (h-kernel)/stride + 1
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
@@ -133,11 +183,11 @@ class PolicyNetwork(nn.Module):
                     nn.Linear(16, action_space_dims),
                     nn.Softmax(dim=0)
                 )
-            elif nn_id == "384":
+            elif self.nn_id == "384":
                 # h' = (h-kernel)/stride + 1
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3, out_channels=16,
+                    nn.Conv2d(in_channels=3*buffer_size, out_channels=16,
                               kernel_size=(5, 5), stride=(5, 5)),
                     nn.ReLU(),
                     # size (16, 12, 16)
@@ -155,18 +205,58 @@ class PolicyNetwork(nn.Module):
                     nn.Softmax(dim=0)
                 )
 
-    def forward(self, observation: torch.Tensor) -> torch.Tensor:
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
 
         Args:
-            observation: Observation from the environment
+            state: Observation from the environment
 
         Returns:
             action_distribution: predicted distribution of action to take
         """
-        action_distribution = self.net(observation.float())  # TODO: remove x.float?
+        if self.maze_env == "minigrid":
+            action_distribution = self.net(state.float())
+            return action_distribution
 
-        return action_distribution
+        elif self.maze_env == "miniworld":
+            # (1, buffer_size, H, W, channels)
+            state = state.permute(0, 1, 4, 2, 3)
+            # (1, buffer_size, channels, H, W)
+
+            if self.nn_id in ["3072", "384"]:
+                state = state.reshape(1, -1, *state.shape[-2:])
+                # (1, buffer_size * channels, H, W)
+
+                action_distribution = self.net(state.float())
+
+            elif self.nn_id == "lstm":
+                # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
+
+                # Get the dimensions
+                # (1, buffer_size, channels, H, W)
+                batch_size, buffer_size, num_channels, height, width = state.size()
+
+                # Initialize Hidden State (short-term memory) and Cell Output (long-term memory)
+                hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                output = torch.zeros(batch_size, 1, 16)
+
+                # Unroll over time steps
+                for frame in range(buffer_size):
+                    observation = state[:, frame]
+                    embedded_obs = self.embedding_net(observation)
+                    embedded_obs = embedded_obs.reshape(batch_size, -1, 16)
+                    output, (hidden_state, cell_output) = self.lstm(embedded_obs, (hidden_state, cell_output))
+
+                output = self.linear(output)
+                action_distribution = self.sigmoid(output)
+            else:
+                raise NameError("unknown nn_id")
+
+            return action_distribution
+
+        else:
+            raise NameError("environment name missing")
 
 
 class Agent:
@@ -215,9 +305,12 @@ class Agent:
             self.rewards = []  # Stores the corresponding rewards
 
             print('nn_id', nn_id)
-            self.net = PolicyNetwork(self.state_shape, action_space_dims,
+            #self.net = PolicyNetwork(self.state_shape, action_space_dims,
+            #                         maze_env=maze_env, nn_id=nn_id,
+            #                         buffer_size=buffer_size or 1)
+            self.net = PolicyNetwork(self.obs_space_dims, action_space_dims,
                                      maze_env=maze_env, nn_id=nn_id,
-                                     buffer_size = buffer_size or 1)
+                                     buffer_size=buffer_size or 1)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -514,10 +607,6 @@ class MiniWorldAgent(Agent):
 
     # override
     def network_policy(self, state, *args, **kwargs):
-        if self.maze_env == "miniworld":
-            state = torch.tensor(state)                         # (1, buffer_size, H, W, channels)
-            state = state.permute(0, 1, 4, 2, 3)                # (1, buffer_size, channels, H, W)
-            state = state.reshape(1, -1, *state.shape[-2:])     # (1, buffer_size * channels, H, W)
-            # TODO: use numpy instead of torch for squeeze and permute
+        # nothing to do actually, but it's here if needed
 
         return super().network_policy(state, *args, **kwargs)

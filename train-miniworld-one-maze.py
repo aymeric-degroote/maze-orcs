@@ -46,7 +46,8 @@ def main(render_mode=None):
     agnostic_method = "scratch"  #"batch"  # "maml"
     #run_id = 52; nn_id = "384"
     run_id = 56; nn_id = "3072"
-    #run_id = 72; nn_id = "3072"; buffer_size=5
+    run_id = 72; nn_id = "384"; buffer_size=5
+    run_id = 69; nn_id = "lstm"; buffer_size = 5
 
     if buffer_size is None:
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}.pth"
@@ -54,13 +55,13 @@ def main(render_mode=None):
         ft_save_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}_seed-{maze_seed}-buffer-{buffer_size}.pth"
     
     # Init from scratch
-    #load_weights_fn = None
+    load_weights_fn = None
 
     # Agnostic
     # load_weights_fn = f"model_weights_method-{agnostic_method}_run-{run_id}.pth"
 
     # Reinforce
-    load_weights_fn = ft_save_weights_fn
+    #load_weights_fn = ft_save_weights_fn
 
     hidden_space_dims = [16, 16]
     action_space_dims = 3
@@ -97,7 +98,7 @@ def main(render_mode=None):
 
     # Plot to see how fast it converges with one agnostic method or another
     plt.plot(rewards_per_maze[0], c='gray', alpha=0.5)
-    #plt.legend()
+    # plt.legend()
     plt.title(f"Reward per episode")
     # plt.savefig(f"runs_minigrid/plots/fine-tuned-{agnostic_method}-agents-rewards-seed-{maze_seed}.png")
     plt.show()
@@ -105,9 +106,9 @@ def main(render_mode=None):
     w = window_plot
     plt.plot(np.convolve(rewards_per_maze[0], np.ones(w), 'valid') / w, c='gray', alpha=0.5)
     # plt.plot(np.convolve(rewards_per_maze.mean(axis=0), np.ones(w), 'valid') / w, c='red', label="Average")
-    #plt.legend()
+    # plt.legend()
     plt.xlabel(f"Average Reward over {w} episodes")
-    #plt.savefig(f"runs_minigrid/plots/fine-tuned-{agnostic_method}-agent-average-rewards-seed-{maze_seed}.png")
+    # plt.savefig(f"runs_minigrid/plots/fine-tuned-{agnostic_method}-agent-average-rewards-seed-{maze_seed}.png")
     plt.show()
 
 
