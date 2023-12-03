@@ -58,14 +58,13 @@ def initialize_training(obs_space_dims,
     elif maze_env.lower() == "miniworld":
         if reward_closer_point is not None:
             env_kwargs["reward_closer_point"] = reward_closer_point
-
         agent = MiniWorldAgent(obs_space_dims, action_space_dims,
-                              maze_env=maze_env,
-                              load_maze=False,
-                              training=True,
-                              load_weights_fn=load_weights_fn,
-                              **agent_kwargs
-                              )
+                               maze_env=maze_env,
+                               load_maze=False,
+                               training=True,
+                               load_weights_fn=load_weights_fn,
+                               **agent_kwargs
+                               )
 
         env = MiniWorldMazeEnv(render_mode=render_mode,
                                size=size,
@@ -82,7 +81,8 @@ def train_agnostic_agent(agent, env, method,
                          num_episodes_per_maze=None,
                          step_print=None,
                          save_weights_fn=None,
-                         batch_size=None
+                         batch_size=None,
+                         retain_graph=None
                          ):
     """
     Methods:
@@ -99,21 +99,24 @@ def train_agnostic_agent(agent, env, method,
                          change_maze_at_each_episode=True,
                          training=True,
                          step_print=step_print,
-                         save_weights_fn=save_weights_fn)
+                         save_weights_fn=save_weights_fn,
+                         retain_graph=retain_graph)
     elif method == "batch":
         return run_agent(agent, env, num_episodes, max_num_step,
                          change_maze_at_each_episode=True,
                          training=True,
                          step_print=step_print,
                          save_weights_fn=save_weights_fn,
-                         batch_size=batch_size)
+                         batch_size=batch_size,
+                         retain_graph=retain_graph)
     elif method.lower() == "maml":
         assert num_episodes_per_maze is not None, "arg 'num_episodes_per_maze' missing"
         return run_maml_agent(agent, env, num_episodes, max_num_step,
                               num_episodes_per_maze,
                               batch_size,
                               # alpha_lr=None, beta_lr=None,
-                              save_weights_fn=save_weights_fn
+                              save_weights_fn=save_weights_fn,
+                              retain_graph=retain_graph
                               )
     else:
         raise NameError(f"method '{method}' unknown")
@@ -123,7 +126,8 @@ def fine_tune_agent(agent, env, maze_seed,
                     num_episodes,
                     max_num_step,
                     step_print=None,
-                    save_weights_fn=None
+                    save_weights_fn=None,
+                    retain_graph=None
                     ):
     env.reset(maze_seed=maze_seed)
 
@@ -131,7 +135,7 @@ def fine_tune_agent(agent, env, maze_seed,
                      change_maze_at_each_episode=False,
                      training=True,
                      step_print=step_print,
-                     save_weights_fn=save_weights_fn)
+                     save_weights_fn=save_weights_fn,retain_graph=retain_graph)
 
 
 def run_episode(agent, env, max_num_step):
@@ -154,7 +158,7 @@ def run_episode(agent, env, max_num_step):
 
 def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episode,
               training=True, step_print=None, save_weights_fn=None,
-              batch_size=None):
+              batch_size=None, retain_graph=None):
     assert training == agent.training, f"Agent is in {'training' if agent.training else 'eval'} mode " \
                                        f"but you are running in {'training' if training else 'eval'} mode"
 
@@ -171,7 +175,7 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
         stats["reward_over_episodes"].append(ep_reward)
         if training:
             if batch_size is None or (ep_id + 1) % batch_size == 0:
-                agent.update()
+                agent.update(retain_graph=retain_graph)
 
         env_stats = env.get_stats()
         agent_pos_seen = env_stats.get("agent_pos_seen")
@@ -199,7 +203,8 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
 
 def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze,
                    batch_size, alpha_lr=None, beta_lr=0.01,
-                   step_print=None, save_weights_fn=None
+                   step_print=None, save_weights_fn=None,
+                   retain_graph=None
                    ):
     """
     Implementation of Algorithm 3 from: https://arxiv.org/abs/1703.03400
@@ -240,7 +245,7 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
 
             # update agent after K episodes
             # technically summing the loss whereas the paper take the average...
-            agent.update()  # TODO: use alpha_lr
+            agent.update(retain_graph=retain_graph)  # TODO: use alpha_lr
 
             for ep_id in range(num_episodes_per_maze//2):
                 ep_reward = run_episode(agent, env, max_num_step)

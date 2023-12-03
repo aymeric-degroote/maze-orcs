@@ -69,7 +69,8 @@ class PolicyNetwork(nn.Module):
                  hidden_space_dims=None,   # For Dense NN
                  nn_id=None,
                  hidden_state_dims=None,  # For LSTM
-                 buffer_size=1):
+                 buffer_size=1,
+                 memory=False):
         """Initializes a neural network that estimates the distribution from which an action is sampled from.
 
         Args:
@@ -82,6 +83,7 @@ class PolicyNetwork(nn.Module):
 
         self.maze_env = maze_env
         self.hidden_state_dims = hidden_state_dims
+        self.memory = memory
 
         if self.maze_env == "minigrid":
             # this is a very basic NN, check in the literature what kind of model architecture
@@ -108,18 +110,11 @@ class PolicyNetwork(nn.Module):
 
             self.nn_id = nn_id
 
-            # TODO: Add LSTM model
+            # TODO: all the hyperparameters are arbitrary for now, needs some fine tuning
 
-            # TODO: if LSTM works, remove the buffer and keep track of the hidden state instead
-
-
-
-            # TODO: the hyperparameters are arbitrary
-
+            # TODO: remove the buffer and keep track of the hidden state instead
             if self.nn_id == "lstm":
                 # input size: (1, buffer_size, channels, H, W)
-                # conv formula: h' = (h-kernel)/stride + 1
-
                 # TODO: Should we use a max_pool layer?
 
                 self.embedding_net = nn.Sequential(
@@ -145,18 +140,18 @@ class PolicyNetwork(nn.Module):
 
                 # TODO: should define hidden_state_dims somewhere else
                 self.hidden_state_dims = 16
-                print('he he')
                 self.lstm = nn.LSTM(input_size=16,
                                     hidden_size=self.hidden_state_dims,
                                     num_layers=1,
-                )
-                print('oh oh')
+                                    )
 
                 self.linear = nn.Linear(16, action_space_dims)
-
                 self.sigmoid = nn.Sigmoid()
 
-
+                if self.memory:
+                    # no batch size
+                    self.hidden_state = [(torch.zeros(1, 1, self.hidden_state_dims),
+                                         torch.zeros(1, 1, self.hidden_state_dims))]
 
             elif self.nn_id == "3072":
                 # h' = (h-kernel)/stride + 1
@@ -230,26 +225,50 @@ class PolicyNetwork(nn.Module):
                 action_distribution = self.net(state.float())
 
             elif self.nn_id == "lstm":
-                # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
+                if not self.memory:
+                    # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
 
-                # Get the dimensions
-                # (1, buffer_size, channels, H, W)
-                batch_size, buffer_size, num_channels, height, width = state.size()
+                    # Get the dimensions
+                    # (1, buffer_size, channels, H, W)
+                    batch_size, buffer_size, num_channels, height, width = state.size()
 
-                # Initialize Hidden State (short-term memory) and Cell Output (long-term memory)
-                hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
-                output = torch.zeros(batch_size, 1, 16)
+                    # Initialize Hidden State (short-term memory) and Cell Output (long-term memory)
+                    # TODO: merge hidden and cell in one state as I did for memory=True
+                    hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                    cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                    output = torch.zeros(batch_size, 1, 16)
 
-                # Unroll over time steps
-                for frame in range(buffer_size):
-                    observation = state[:, frame]
+                    for frame in range(buffer_size):
+                        observation = state[:, frame]
+                        embedded_obs = self.embedding_net(observation)
+                        embedded_obs = embedded_obs.reshape(batch_size, -1, 16)
+                        output, (hidden_state, cell_output) = self.lstm(embedded_obs, (hidden_state, cell_output))
+
+                    output = self.linear(output)
+                    action_distribution = self.sigmoid(output)
+                else:
+                    # state is a frame sequence (batch_size, num_channels, seq_len, height, width)
+
+                    # Get the dimensions
+                    # (1, 1, channels, H, W)
+                    batch_size, _, num_channels, height, width = state.size()
+
+                    observation = state[:, 0]
                     embedded_obs = self.embedding_net(observation)
                     embedded_obs = embedded_obs.reshape(batch_size, -1, 16)
-                    output, (hidden_state, cell_output) = self.lstm(embedded_obs, (hidden_state, cell_output))
+                    # new_hidden_state = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                    # new_cell_output = torch.zeros(batch_size, 1, self.hidden_state_dims)
+                    # output = torch.zeros(batch_size, 1, 16)
 
-                output = self.linear(output)
-                action_distribution = self.sigmoid(output)
+                    # found this line on a forum. don't know why it works, but it works!
+                    # I think it's making a copy basically
+                    hidden = tuple([each.data for each in self.hidden_state[-1]])
+
+                    output, new_hidden_state = self.lstm(embedded_obs, hidden)
+                    self.hidden_state.append(new_hidden_state)
+
+                    output = self.linear(output)
+                    action_distribution = self.sigmoid(output)
             else:
                 raise NameError("unknown nn_id")
 
@@ -270,6 +289,7 @@ class Agent:
                  load_weights_fn=None, network=True,
                  nn_id=None, path='.',
                  learning_rate=1e-4, discount_factor=0.95, buffer_size=None,
+                 memory=False,
                  **kwargs):
         if kwargs:
             print("Agent init: unused kwargs:", kwargs)
@@ -310,7 +330,8 @@ class Agent:
             #                         buffer_size=buffer_size or 1)
             self.net = PolicyNetwork(self.obs_space_dims, action_space_dims,
                                      maze_env=maze_env, nn_id=nn_id,
-                                     buffer_size=buffer_size or 1)
+                                     buffer_size=buffer_size or 1,
+                                     memory=memory)
 
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
@@ -411,7 +432,7 @@ class Agent:
 
         return loss
 
-    def update(self, loss=None, do_backward=True):
+    def update(self, loss=None, do_backward=True, retain_graph=None):
         """Updates the policy network's weights."""
         if loss is None:
             loss = self.compute_loss()
@@ -419,7 +440,9 @@ class Agent:
         # Update the policy network
         if do_backward:
             self.optimizer.zero_grad()
-            loss.backward()
+            # TODO: do we need retain_graph? I added it for debugging LSTM, but not sure it matters
+            # try to run LSTM with memory before removing it
+            loss.backward(retain_graph=retain_graph)
         self.optimizer.step()
 
         # Empty / zero out all episode-centric/related variables
