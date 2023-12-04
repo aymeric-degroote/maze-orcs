@@ -326,6 +326,7 @@ class Agent:
             #self.net = PolicyNetwork(self.state_shape, action_space_dims,
             #                         maze_env=maze_env, nn_id=nn_id,
             #                         buffer_size=buffer_size or 1)
+            self.retain_graph = None or memory
             self.net = PolicyNetwork(self.obs_space_dims, action_space_dims,
                                      maze_env=maze_env, nn_id=nn_id,
                                      buffer_size=buffer_size or 1,
@@ -430,7 +431,7 @@ class Agent:
 
         return loss
 
-    def update(self, loss=None, do_backward=True, retain_graph=None):
+    def update(self, loss=None, do_backward=True):
         """Updates the policy network's weights."""
         if loss is None:
             loss = self.compute_loss()
@@ -440,7 +441,7 @@ class Agent:
             self.optimizer.zero_grad()
             # TODO: do we need retain_graph? I added it for debugging LSTM, but not sure it matters
             # try to run LSTM with memory before removing it
-            loss.backward(retain_graph=retain_graph)
+            loss.backward(retain_graph=self.retain_graph)
         self.optimizer.step()
 
         # Empty / zero out all episode-centric/related variables
