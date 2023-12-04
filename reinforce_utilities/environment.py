@@ -162,7 +162,6 @@ class MiniGridMazeEnv(MiniGridEnv):
 class MiniWorldMazeEnv(MiniWorldMaze):
     def __init__(
             self,
-            size=31,
             num_rows=3,
             num_cols=3,
             room_size=2,
@@ -175,11 +174,11 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             reward_closer_point=0.0,
             **kwargs,
     ):
-        #self.size = size
+        # self.size = size
         self.maze_type = maze_type
         self.maze_seed = maze_seed
 
-        #self._gen_positions()
+        # self._gen_positions()
         self.ui_render = render_mode == "human"
 
         # TODO: call self.reset() here
@@ -192,13 +191,13 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         self.best_dist = 1e8
         self.reward_closer_point = reward_closer_point
 
-        super().__init__(# "MiniWorld-Maze-v0",
-                         num_rows=3,
-                         num_cols=3,
-                         max_episode_steps=max_steps,
-                         room_size=2,
-                         render_mode='human',  # 'top',
-                         view='top')
+        super().__init__(
+            num_rows=num_rows,
+            num_cols=num_cols,
+            max_episode_steps=max_steps,
+            room_size=room_size,
+            render_mode='human',  # 'top',
+            view=view)
 
     def step(self, *args, **kwargs):
         observation, reward, terminated, truncated, info = super().step(*args, **kwargs)
@@ -231,8 +230,8 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             self.maze_seed = maze_seed
 
         _output = super().reset(seed=self.maze_seed, *args, **kwargs)
-        
-        #self._gen_positions()
+
+        # self._gen_positions()
 
         self.total_reward = 0
         self.nb_actions = 0
@@ -244,7 +243,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         return {
             "total_reward": self.total_reward,
             "nb_actions": self.nb_actions,
-            "total_movements": self.total_movements ,
+            "total_movements": self.total_movements,
         }
 
     def reset_to_seed(self):
@@ -255,4 +254,4 @@ class MiniWorldMazeEnv(MiniWorldMaze):
     def gen_obs(self, *args, **kwargs):
         obs = super().render_obs(*args, **kwargs)
 
-        return obs #.get('image')[:, :, 0]
+        return obs  # .get('image')[:, :, 0]

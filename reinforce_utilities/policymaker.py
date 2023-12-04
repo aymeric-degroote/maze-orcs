@@ -41,11 +41,11 @@ class MazeGrid:
         """
         observed_image = observation  # .get('image')[:,:,0]
         window = self.grid[self.center[0] - 6:self.center[0] + 1,
-                 self.center[1] - 3:self.center[1] + 4] * 1  # copy
+                           self.center[1] - 3:self.center[1] + 4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
 
         self.grid[self.center[0] - 6:self.center[0] + 1,
-        self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
+                  self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
 
     def can_move_forward(self):
         return self.grid[self.center[0] - 1, self.center[1]] == self.EMPTY
@@ -66,7 +66,7 @@ class PolicyNetwork(nn.Module):
 
     def __init__(self, obs_space_dims, action_space_dims: int,
                  maze_env,
-                 hidden_space_dims=None,   # For Dense NN
+                 hidden_space_dims=None,  # For Dense NN
                  nn_id=None,
                  hidden_state_dims=None,  # For LSTM
                  buffer_size=1,
@@ -89,7 +89,8 @@ class PolicyNetwork(nn.Module):
             # this is a very basic NN, check in the literature what kind of model architecture
             # they use if you want to improve it
 
-            hidden_space_dims = [64, 32]
+            if hidden_space_dims is None:
+                hidden_space_dims = [64, 32]
             model_dims = [np.prod(obs_space_dims) * 4] + hidden_space_dims + [action_space_dims]
 
             print("model dims", model_dims)
@@ -142,30 +143,33 @@ class PolicyNetwork(nn.Module):
                     nn.Linear(128, self.embedded_state_dims)
                 )
 
-                self.lstm = nn.LSTM(input_size= self.embedded_state_dims,
+                self.lstm = nn.LSTM(input_size=self.embedded_state_dims,
                                     hidden_size=self.hidden_state_dims,
                                     num_layers=self.lstm_num_Layers,
                                     )
 
                 # TODO: what about concatenating hidden_state and embedded_state as input for action_net?
                 # TODO: I think we need a Deep Dense NN here. 3 layers size 64. Can't hurt.
+                dense_layer_dims = 64
                 self.action_net = nn.Sequential(
-                    nn.Linear(self.hidden_state_dims, 16),
+                    nn.Linear(self.hidden_state_dims, dense_layer_dims),
                     nn.Tanh(),
-                    nn.Linear(16, action_space_dims),
+                    nn.Linear(dense_layer_dims, dense_layer_dims),
+                    nn.Tanh(),
+                    nn.Linear(dense_layer_dims, action_space_dims),
                     nn.Sigmoid()
                 )
 
                 if self.memory:
                     # no batch size = 1
                     self.hidden_state = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
-                    self.cell_output  = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
+                    self.cell_output = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
 
             elif self.nn_id == "3072":
                 # h' = (h-kernel)/stride + 1
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3*buffer_size, out_channels=16,
+                    nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
                               kernel_size=(6, 6), stride=(2, 2)),
                     nn.ReLU(),
                     # size (16, 28, 38)
@@ -190,7 +194,7 @@ class PolicyNetwork(nn.Module):
                 # h' = (h-kernel)/stride + 1
                 self.net = nn.Sequential(
                     # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3*buffer_size, out_channels=16,
+                    nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
                               kernel_size=(5, 5), stride=(5, 5)),
                     nn.ReLU(),
                     # size (16, 12, 16)
@@ -254,7 +258,7 @@ class PolicyNetwork(nn.Module):
                     self.hidden_state = new_hidden_state
                     self.cell_output = new_cell_output
 
-                    #self.hidden_state = [new_hidden_state]
+                    # self.hidden_state = [new_hidden_state]
 
                 else:
                     # Initialize Hidden State (short-term memory & long-term memory)
@@ -326,7 +330,7 @@ class Agent:
             self.rewards = []  # Stores the corresponding rewards
 
             print('nn_id', nn_id)
-            #self.net = PolicyNetwork(self.state_shape, action_space_dims,
+            # self.net = PolicyNetwork(self.state_shape, action_space_dims,
             #                         maze_env=maze_env, nn_id=nn_id,
             #                         buffer_size=buffer_size or 1)
             self.retain_graph = None or memory
