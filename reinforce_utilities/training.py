@@ -1,4 +1,3 @@
-
 from copy import deepcopy
 
 import numpy as np
@@ -45,13 +44,13 @@ def initialize_training(obs_space_dims,
 
     if maze_env.lower() == "minigrid":
         agent = MiniGridAgent(obs_space_dims, action_space_dims,
-                  size=size,
-                  maze_env=maze_env,
-                  load_maze=False,
-                  training=True,
-                  load_weights_fn=load_weights_fn,
-                  **agent_kwargs
-                  )
+                              size=size,
+                              maze_env=maze_env,
+                              load_maze=False,
+                              training=True,
+                              load_weights_fn=load_weights_fn,
+                              **agent_kwargs
+                              )
         env = MiniGridMazeEnv(render_mode=render_mode,
                               size=size,
                               **env_kwargs)
@@ -67,7 +66,6 @@ def initialize_training(obs_space_dims,
                                )
 
         env = MiniWorldMazeEnv(render_mode=render_mode,
-                               size=size,
                                **env_kwargs)
     else:
         raise NameError
@@ -221,7 +219,7 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
 
         # TODO: do we want to have new mazes for each batch? I assumed so
         # TODO: use iter function to generate the seeds
-        maze_seeds = list(range(maze_seeds[-1]+1, maze_seeds[-1]+1+batch_size))
+        maze_seeds = list(range(maze_seeds[-1] + 1, maze_seeds[-1] + 1 + batch_size))
 
         ft_weights_grad_list = {}
 
@@ -231,7 +229,7 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
 
             agent.set_weights(agnostic_weights)
             maze_reward = 0
-            for ep_id in range(num_episodes_per_maze//2):
+            for ep_id in range(num_episodes_per_maze // 2):
                 ep_reward = run_episode(agent, env, max_num_step)
                 maze_reward += ep_reward
 
@@ -241,14 +239,14 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
             # technically summing the loss whereas the paper take the average...
             agent.update()  # TODO: use alpha_lr
 
-            for ep_id in range(num_episodes_per_maze//2):
+            for ep_id in range(num_episodes_per_maze // 2):
                 ep_reward = run_episode(agent, env, max_num_step)
                 maze_reward += ep_reward
 
                 stats["reward_over_episodes"].append(ep_reward)
 
-            batch_rewards.append(maze_reward/num_episodes_per_maze)
-            #batch_rewards.append(ep_reward)
+            batch_rewards.append(maze_reward / num_episodes_per_maze)
+            # batch_rewards.append(ep_reward)
 
             loss = agent.compute_loss()
             loss.backward()
@@ -271,8 +269,8 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
             # Important that it's not a copy here
             grad_tensor = sum(ft_weights_grad_list[weight_name])
             with torch.no_grad():
-                #print('beta', beta_lr, '      ')
-                #print('grad', grad_tensor)
+                # print('beta', beta_lr, '      ')
+                # print('grad', grad_tensor)
                 param -= beta_lr * grad_tensor
 
         print(f"Batch #{str(batch_id).rjust(3)} "
