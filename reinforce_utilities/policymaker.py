@@ -120,6 +120,7 @@ class PolicyNetwork(nn.Module):
                 self.lstm_num_Layers = 3
 
                 # TODO: Should we use a max_pool layer at first?
+                # TODO: Can we train embedding net separately? Use autoencoder?
                 self.embedding_net = nn.Sequential(
                     # size (3, 60, 80)
                     nn.Conv2d(in_channels=3, out_channels=16,
@@ -146,6 +147,8 @@ class PolicyNetwork(nn.Module):
                                     num_layers=self.lstm_num_Layers,
                                     )
 
+                # TODO: what about concatenating hidden_state and embedded_state as input for action_net?
+                # TODO: I think we need a Deep Dense NN here. 3 layers size 64. Can't hurt.
                 self.action_net = nn.Sequential(
                     nn.Linear(self.hidden_state_dims, 16),
                     nn.Tanh(),
