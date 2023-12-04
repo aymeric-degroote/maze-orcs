@@ -9,8 +9,8 @@ TODO: rename this file as minigreedy.py
 
 from __future__ import annotations
 
-from minigrid_utilities.environment import MiniGridMazeEnv
-from minigrid_utilities.policymaker import Agent, MiniGridAgent
+from reinforce_utilities.environment import MiniGridMazeEnv
+from reinforce_utilities.policymaker import Agent, MiniGridAgent
 
 
 def main():
