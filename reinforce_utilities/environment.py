@@ -24,6 +24,8 @@ from mazelib.generate.DungeonRooms import DungeonRooms
 from miniworld.miniworld import MiniWorldEnv
 from miniworld.envs.maze import Maze as MiniWorldMaze
 
+#from gymnasium.utils import seeding
+
 
 class MiniGridMazeEnv(MiniGridEnv):
     """
@@ -169,7 +171,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             max_steps: int | None = 1000,
             maze_seed=None,
             maze_type="dungeon",
-            reward_new_cell=0.0,
+            reward_new_position=0.0,
             reward_closer_point=0.0,
             **kwargs,
     ):
@@ -180,10 +182,13 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         #self._gen_positions()
         self.ui_render = render_mode == "human"
 
+        # TODO: call self.reset() here
         self.total_reward = 0
         self.nb_actions = 0
+        self.total_movements = 0
+
         self.agent_pos_seen = set()
-        self.reward_new_cell = reward_new_cell
+        self.reward_new_position = reward_new_position
         self.best_dist = 1e8
         self.reward_closer_point = reward_closer_point
 
@@ -201,8 +206,9 @@ class MiniWorldMazeEnv(MiniWorldMaze):
 
         custom_reward = 0
         if tuple(self.agent.pos) not in self.agent_pos_seen:
-            custom_reward += self.reward_new_cell
+            custom_reward += self.reward_new_position
             self.agent_pos_seen.add(tuple(self.agent.pos))
+            self.total_movements += 1
 
         if self.reward_closer_point > 0:
             dist = np.linalg.norm(self.agent.pos - self.box.pos)
@@ -223,22 +229,27 @@ class MiniWorldMazeEnv(MiniWorldMaze):
     def reset(self, maze_seed=None, *args, **kwargs):
         if maze_seed is not None:
             self.maze_seed = maze_seed
+            #self.np_random.seed(maze_seed)
 
-        output = super().reset(*args, **kwargs)
+        _output = super().reset(seed=maze_seed, *args, **kwargs)
 
+        #self._np_random, seed = seeding.np_random(maze_seed)
+        #self.np_random, seed = seeding.np_random(maze_seed)
         # TODO: the seed has no effect here
 
         #self._gen_positions()
 
         self.total_reward = 0
         self.nb_actions = 0
+        self.total_movements = 0
 
-        return output
+        return _output
 
     def get_stats(self):
         return {
             "total_reward": self.total_reward,
-            "nb_actions": self.nb_actions
+            "nb_actions": self.nb_actions,
+            "total_movements": self.total_movements ,
         }
 
     def reset_to_seed(self):

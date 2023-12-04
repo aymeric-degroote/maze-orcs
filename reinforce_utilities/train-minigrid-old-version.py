@@ -14,11 +14,11 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from minigrid_utilities.environment import MiniGridMazeEnv
-from minigrid_utilities.policymaker import Agent
+from reinforce_utilities.environment import MiniGridMazeEnv
+from reinforce_utilities.policymaker import Agent
 import pickle
 
-from minigrid_utilities.training import run_episode
+from reinforce_utilities.training import run_episode
 
 
 def main():

@@ -16,7 +16,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from minigrid_utilities.training import train_agnostic_agent, initialize_training, fine_tune_agent
+from reinforce_utilities.training import train_agnostic_agent, initialize_training, fine_tune_agent
 
 
 def main(render_mode=None):

@@ -18,7 +18,7 @@ from utilities.memory import ReplayBuffer
 
 import torch
 
-from minigrid_utilities.training import initialize_training, fine_tune_agent, run_agent
+from reinforce_utilities.training import initialize_training, fine_tune_agent, run_agent
 
 
 def main(render_mode=None):
@@ -50,6 +50,7 @@ def main(render_mode=None):
     run_id = 72; nn_id = "384"; buffer_size=5
     run_id = 69; nn_id = "lstm"; buffer_size = 5
     run_id = 77; nn_id = "lstm"; buffer_size = 1; memory = True
+    run_id = 58; nn_id = "384"
 
     #torch.autograd.set_detect_anomaly(True)
 
@@ -97,8 +98,7 @@ def main(render_mode=None):
                       change_maze_at_each_episode=False,
                       training=True,
                       step_print=step_print,
-                      save_weights_fn=ft_save_weights_fn,
-                      retain_graph=None or memory)
+                      save_weights_fn=ft_save_weights_fn)
 
     rewards_per_maze[0] = stats["reward_over_episodes"]
 
