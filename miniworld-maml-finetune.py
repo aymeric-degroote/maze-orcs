@@ -22,8 +22,8 @@ def main(render_mode=None):
     # TODO: save all the parameters for one run in a txt/pickle/json file
     #  so that we don't need to write everything again
 
-    # number of episodes in total
-    num_episodes_fine_tune = 1000
+    # number of episodes for each maze
+    num_episodes_fine_tune = 30
 
     max_num_step = 200
     num_mazes = 10

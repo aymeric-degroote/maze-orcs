@@ -24,7 +24,7 @@ from mazelib.generate.DungeonRooms import DungeonRooms
 from miniworld.miniworld import MiniWorldEnv
 from miniworld.envs.maze import Maze as MiniWorldMaze
 
-#from gymnasium.utils import seeding
+from gymnasium.utils import seeding
 
 
 class MiniGridMazeEnv(MiniGridEnv):
@@ -229,14 +229,9 @@ class MiniWorldMazeEnv(MiniWorldMaze):
     def reset(self, maze_seed=None, *args, **kwargs):
         if maze_seed is not None:
             self.maze_seed = maze_seed
-            #self.np_random.seed(maze_seed)
 
-        _output = super().reset(seed=maze_seed, *args, **kwargs)
-
-        #self._np_random, seed = seeding.np_random(maze_seed)
-        #self.np_random, seed = seeding.np_random(maze_seed)
-        # TODO: the seed has no effect here
-
+        _output = super().reset(seed=self.maze_seed, *args, **kwargs)
+        
         #self._gen_positions()
 
         self.total_reward = 0
