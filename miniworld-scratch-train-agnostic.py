@@ -8,35 +8,30 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from reinforce_utilities.training import initialize_training, train_agnostic_agent
+from reinforce_utilities.training import initialize_training, train_agnostic_agent, run_agent
 
 import wandb
 wandb.login()
 
-
 def main(render_mode=None):
 
     num_episodes = 5000
-    num_episodes_per_maze = 100  # for MAML method
-    batch_size = 5
-    # num_batches = num_episodes // (num_episodes_per_maze * batch_size)
-
     max_num_step = 1000
 
-    step_print = 100  # not used yet for maml training
+    step_print = 100
     window_plot = 100 #step_print
     learning_rate = 1e-4
     discount_factor = 0.95
     reward_new_position = 0.001
-    reward_closer_point = 0.001
+    reward_closer_point = 0.0 #01
 
     buffer_size = 1
     memory = False
 
-    agnostic_method = "maml"
-    run_id = 101; nn_id = "384"
-    run_id = 103; nn_id = "lstm"; memory = True
-    run_id = 105; nn_id = "3072"
+    agnostic_method = "scratch"
+    run_id = 201; nn_id = "384"
+    #run_id = 203; nn_id = "lstm"; memory = True
+    run_id = 205; nn_id = "3072"
 
     run_info = f"method-{agnostic_method}_run-{run_id}"
 
@@ -63,31 +58,31 @@ def main(render_mode=None):
                                      nn_id=nn_id,
                                      memory=memory)
 
-    print("-- Training agnostic model --")
-    print(f"Starting MAML training of run {run_info}")
+    print("-- Training model --")
+    print(f"Starting scratch training of run {run_info}")
 
-    stats = train_agnostic_agent(agent, env,
-                                 method=agnostic_method,
-                                 num_episodes=num_episodes,
-                                 max_num_step=max_num_step,
-                                 num_episodes_per_maze=num_episodes_per_maze,
-                                 step_print=step_print,
-                                 save_weights_fn=save_agnostic_weights_fn,
-                                 batch_size=batch_size)
+    stats = run_agent(agent, env,
+                      num_episodes=num_episodes,
+                      max_num_step=max_num_step,
+                      change_maze_at_each_episode=True,
+                      training=True,
+                      step_print=step_print,
+                      save_weights_fn=save_agnostic_weights_fn)
 
     if wandb.run is not None:
         wandb.run.finish()
 
-    plt.plot(stats["reward_over_episodes"])
-    plt.xlabel("Episodes")
-    plt.ylabel("Reward")
+    # Plot to see how fast it converges with one agnostic method or another
+    plt.plot(stats["reward_over_episodes"], c='gray', alpha=0.5)
+    plt.title(f"Reward per episode")
     plt.savefig(f"runs_miniworld/plots/{run_info}-agnostic-rewards.png")
     plt.show()
 
     w = window_plot
-    plt.plot(np.convolve(stats["reward_over_episodes"], np.ones(w), 'valid') / w)
+    plt.plot(np.convolve(stats["reward_over_episodes"], np.ones(w), 'valid') / w, c='gray', alpha=0.5)
+    # plt.plot(np.convolve(rewards_per_maze.mean(axis=0), np.ones(w), 'valid') / w, c='red', label="Average")
+    # plt.legend()
     plt.xlabel(f"Average Reward over {w} episodes")
-    plt.ylabel("Reward")
     plt.savefig(f"runs_miniworld/plots/{run_info}-agnostic-average-rewards.png")
     plt.show()
 
