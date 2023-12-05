@@ -37,7 +37,7 @@ def main(render_mode=None):
     size = 13
     learning_rate = 1e-4
     discount_factor = 0.95
-    reward_new_cell = 0.01
+    reward_new_position = 0.01
     reward_closer_point = 0.01
 
     buffer_size = 1
@@ -80,7 +80,7 @@ def main(render_mode=None):
                                      learning_rate=learning_rate,
                                      render_mode=render_mode,
                                      buffer_size=buffer_size,
-                                     reward_new_cell=reward_new_cell,
+                                     reward_new_position=reward_new_position,
                                      reward_closer_point=reward_closer_point,
                                      discount_factor=discount_factor,
                                      nn_id=nn_id,

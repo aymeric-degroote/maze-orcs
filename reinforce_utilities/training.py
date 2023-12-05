@@ -11,6 +11,8 @@ import miniworld
 
 from utilities.wrappers import WarpFrame, PyTorchFrame
 
+import wandb
+
 
 def initialize_training(obs_space_dims,
                         action_space_dims,
@@ -19,7 +21,7 @@ def initialize_training(obs_space_dims,
                         load_weights_fn=None,
                         render_mode=None,
                         learning_rate=None,
-                        reward_new_cell=None,
+                        reward_new_position=None,
                         reward_closer_point=None,
                         maze_gen_algo=None,
                         buffer_size=None,
@@ -37,10 +39,8 @@ def initialize_training(obs_space_dims,
         agent_kwargs["discount_factor"] = discount_factor
 
     env_kwargs = dict()
-    if reward_new_cell is not None:
-        env_kwargs["reward_new_cell"] = reward_new_cell
-    if maze_gen_algo is not None:
-        env_kwargs["maze_gen_algo"] = maze_gen_algo
+    if reward_new_position is not None:
+        env_kwargs["reward_new_position"] = reward_new_position
 
     if maze_env.lower() == "minigrid":
         agent = MiniGridAgent(obs_space_dims, action_space_dims,
@@ -51,20 +51,22 @@ def initialize_training(obs_space_dims,
                               load_weights_fn=load_weights_fn,
                               **agent_kwargs
                               )
+        if maze_gen_algo is not None:
+            env_kwargs["maze_gen_algo"] = maze_gen_algo
+
         env = MiniGridMazeEnv(render_mode=render_mode,
                               size=size,
                               **env_kwargs)
     elif maze_env.lower() == "miniworld":
-        if reward_closer_point is not None:
-            env_kwargs["reward_closer_point"] = reward_closer_point
         agent = MiniWorldAgent(obs_space_dims, action_space_dims,
                                maze_env=maze_env,
-                               load_maze=False,
                                training=True,
                                load_weights_fn=load_weights_fn,
                                **agent_kwargs
                                )
 
+        if reward_closer_point is not None:
+            env_kwargs["reward_closer_point"] = reward_closer_point
         env = MiniWorldMazeEnv(render_mode=render_mode,
                                **env_kwargs)
     else:
@@ -156,6 +158,8 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
                                        f"but you are running in {'training' if training else 'eval'} mode"
 
     stats = init_stats()
+    if wandb.run is not None:
+        moving_average = 0
 
     for ep_id in range(num_episodes):
         if change_maze_at_each_episode:
@@ -166,11 +170,25 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
         ep_reward = run_episode(agent, env, max_num_step)
 
         stats["reward_over_episodes"].append(ep_reward)
+
         if training:
             if batch_size is None or (ep_id + 1) % batch_size == 0:
                 agent.update()
 
         env_stats = env.get_stats()
+
+        if wandb.run is not None:
+            if ep_id >= 100:
+                moving_average = np.mean(stats["reward_over_episodes"][-100:])
+
+            wandb.log({"total_reward": env_stats.get("total_reward"),
+                       "total_basic_reward": env_stats.get("total_basic_reward"),
+                       "total_custom_reward": env_stats.get("total_custom_reward"),
+                       "episode reward": ep_reward,
+                       "moving avg": moving_average,
+                       "maze_seed": env.maze_seed,
+                       "episode num": ep_id})
+
         agent_pos_seen = env_stats.get("agent_pos_seen")
         nb_actions = env_stats.get("nb_actions")
 
@@ -178,13 +196,14 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
             nb_cells_seen = len(agent_pos_seen)
         else:
             nb_cells_seen = 0
+
         stats["nb_cells_seen_over_episodes"].append(nb_cells_seen)
         stats["nb_actions_over_episodes"].append(nb_actions)
 
         if step_print and (ep_id + 1) % step_print == 0:
             print(f"Episode {str(ep_id + 1).rjust(3)} "
                   f"| Average Reward {np.mean(stats['reward_over_episodes'][-step_print:]):.4f} "
-                  f"| Cells seen {np.mean(stats['nb_cells_seen_over_episodes'][-step_print:])} "
+                  f"| Positions seen {np.mean(stats['nb_cells_seen_over_episodes'][-step_print:])} "
                   f"| Number of steps {np.mean(stats['nb_actions_over_episodes'][-step_print:])}")
 
             if training and save_weights_fn:
@@ -196,8 +215,7 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
 
 def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze,
                    batch_size, alpha_lr=None, beta_lr=0.01,
-                   step_print=None, save_weights_fn=None,
-                   ):
+                   step_print=None, save_weights_fn=None):
     """
     Implementation of Algorithm 3 from: https://arxiv.org/abs/1703.03400
     H: max_num_step
@@ -210,6 +228,8 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
     maze_seeds = [-1]
 
     stats = init_stats()
+    if wandb.run is not None:
+        moving_average = 0
 
     for batch_id in range(num_batches):
         print(f"-- Batch {batch_id} --")
@@ -235,6 +255,16 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
 
                 stats["reward_over_episodes"].append(ep_reward)
 
+                if wandb.run is not None:
+                    if len(stats["reward_over_episodes"]) >= 100:
+                        moving_average = np.mean(stats["reward_over_episodes"][-100:])
+
+                    wandb.log({"episode reward": ep_reward,
+                               "moving avg": moving_average,
+                               "maze_seed": maze_seed,
+                               "batch_id": batch_id,
+                               'episode num': len(stats["reward_over_episodes"])})
+
             # update agent after K episodes
             # technically summing the loss whereas the paper take the average...
             agent.update()  # TODO: use alpha_lr
@@ -244,6 +274,16 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
                 maze_reward += ep_reward
 
                 stats["reward_over_episodes"].append(ep_reward)
+
+                if wandb.run is not None:
+                    if len(stats["reward_over_episodes"]) >= 100:
+                        moving_average = np.mean(stats["reward_over_episodes"][-100:])
+
+                    wandb.log({"episode reward": ep_reward,
+                               "moving avg": moving_average,
+                               "maze_seed": maze_seed,
+                               "batch_id": batch_id,
+                               'episode num': len(stats["reward_over_episodes"])})
 
             batch_rewards.append(maze_reward / num_episodes_per_maze)
             # batch_rewards.append(ep_reward)

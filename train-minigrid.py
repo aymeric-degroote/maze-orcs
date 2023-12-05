@@ -55,7 +55,7 @@ def main(render_mode=None):
                                      load_weights_fn=load_weights_fn,
                                      learning_rate=learning_rate,
                                      render_mode=render_mode,
-                                     reward_new_cell=reward_new_cell)
+                                     reward_new_position=reward_new_cell)
 
     print("-- Training agnostic model --")
     stats = train_agnostic_agent(agent, env,

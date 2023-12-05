@@ -160,35 +160,26 @@ class MiniGridMazeEnv(MiniGridEnv):
 
 
 class MiniWorldMazeEnv(MiniWorldMaze):
-    def __init__(
-            self,
-            num_rows=3,
-            num_cols=3,
-            room_size=2,
-            render_mode='human',
-            view='top',
-            max_steps: int | None = 1000,
-            maze_seed=None,
-            maze_type="dungeon",
-            reward_new_position=0.0,
-            reward_closer_point=0.0,
-            **kwargs,
-    ):
-        # self.size = size
-        self.maze_type = maze_type
-        self.maze_seed = maze_seed
+    def __init__(self,
+                 num_rows=3,
+                 num_cols=3,
+                 room_size=2,
+                 render_mode='human',
+                 view='top',
+                 max_steps: int | None = 1000,
+                 maze_seed=None,
+                 reward_new_position=0.0,
+                 reward_closer_point=0.0,
+                 **kwargs,):
+        if kwargs:
+            print("MiniWorldMazeEnv init: unused kwargs:", kwargs)
 
         # self._gen_positions()
         self.ui_render = render_mode == "human"
 
-        # TODO: call self.reset() here
-        self.total_reward = 0
-        self.nb_actions = 0
-        self.total_movements = 0
+        self.reset(maze_seed)
 
-        self.agent_pos_seen = set()
         self.reward_new_position = reward_new_position
-        self.best_dist = 1e8
         self.reward_closer_point = reward_closer_point
 
         super().__init__(
@@ -200,8 +191,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             view=view)
 
     def step(self, *args, **kwargs):
-        observation, reward, terminated, truncated, info = super().step(*args, **kwargs)
-        # TODO: separate reward and custom_reward so we can track progress more easily
+        observation, basic_reward, terminated, truncated, info = super().step(*args, **kwargs)
 
         custom_reward = 0
         if tuple(self.agent.pos) not in self.agent_pos_seen:
@@ -215,9 +205,11 @@ class MiniWorldMazeEnv(MiniWorldMaze):
                 self.best_dist = dist
                 custom_reward += self.reward_closer_point
 
-        reward += custom_reward
+        reward = basic_reward + custom_reward
 
         self.nb_actions += 1
+        self.total_basic_reward += basic_reward
+        self.total_custom_reward += custom_reward
         self.total_reward += reward
 
         if self.ui_render:
@@ -234,16 +226,23 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         # self._gen_positions()
 
         self.total_reward = 0
+        self.total_basic_reward = 0
+        self.total_custom_reward = 0
         self.nb_actions = 0
         self.total_movements = 0
+        self.agent_pos_seen = set()
+        self.best_dist = 1e8
 
         return _output
 
     def get_stats(self):
         return {
             "total_reward": self.total_reward,
+            "total_basic_reward": self.total_basic_reward,
+            "total_custom_reward": self.total_custom_reward,
+            "agent_pos_seen": self.agent_pos_seen,
             "nb_actions": self.nb_actions,
-            "total_movements": self.total_movements,
+            "total_movements": self.total_movements, # = len(agent_pos_seen)
         }
 
     def reset_to_seed(self):
