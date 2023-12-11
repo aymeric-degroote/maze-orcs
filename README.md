@@ -15,12 +15,17 @@ Instructor: Shipra Agrawal
 
 To train an agnostic model using REINFORCE on MiniWorld:
 ```
+python3 miniworld-classic-train-agnostic.py
+```
+or
+```
 python3 miniworld-maml-train-agnostic.py
 ```
 in the terminal. 
-To fine tune the agnostic model:
+
+To fine tune an agnostic model on several mazes and assess performance:
 ```
-python3 miniworld-maml-finetune.py
+python3 miniworld-finetune-agnostic.py
 ```
 in the terminal.
 
@@ -38,7 +43,7 @@ python3 run-minigrid.py
 ```
 in the terminal.
 
-To display REINFORCE on MiniGrid:
+To see how REINFORCE is doing on MiniGrid:
 ```
 python3 run-minigrid.py human
 ```

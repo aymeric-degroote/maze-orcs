@@ -177,8 +177,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
         # self._gen_positions()
         self.ui_render = render_mode == "human"
 
-        self.reset(maze_seed)
-
+        self.maze_seed = maze_seed
         self.reward_new_position = reward_new_position
         self.reward_closer_point = reward_closer_point
 
@@ -189,6 +188,8 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             room_size=room_size,
             render_mode='human',  # 'top',
             view=view)
+
+        self.reset(maze_seed)
 
     def step(self, *args, **kwargs):
         observation, basic_reward, terminated, truncated, info = super().step(*args, **kwargs)
