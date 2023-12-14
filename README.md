@@ -66,5 +66,10 @@ python3 maze_dqn.py
 after installing dependencies
 
 
+In the training of REINFORCE using a Value function approach, we edited a few files in the miniworld library 
+directly that we did not find relevant to add to the repo. However, those two files are:
+- manual_control.py
+- miniworld_control.py
+
 
 
