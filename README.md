@@ -1,9 +1,8 @@
 # maze-orcs
 
-Multi-agent RL for Efficient Maze Navigation
+Deep Reinforcement Learning for End-to-End Maze Navigation
 
-
-ORCS 4529 - Reinforcement Learning
+ORCS E4529 - Reinforcement Learning
 Project - Fall 2023
 
 Team members:  
@@ -60,19 +59,10 @@ python3 maze_gym.py
 ```
 in the terminal.
 
-Module for training a maze navigator via DQN. In this task the agent is rewarded 
-when it successfully navigates to the red box in the map. Maps are randomly generated 
-mazes, and you can run training via:
-'''
-python3 maze_dqn.py
-'''
-after installing dependencies
 
 
 In the training of REINFORCE using a Value function approach, we edited a few files in the miniworld library 
 directly that we did not find relevant to add to the repo. However, those two files are:
 - manual_control.py
 - miniworld_control.py
-
-
 
