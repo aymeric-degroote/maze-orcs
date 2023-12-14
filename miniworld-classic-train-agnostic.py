@@ -16,12 +16,12 @@ def main(render_mode=None):
 
     use_wandb = False
 
-    num_episodes = 5000
+    num_episodes = 10000
     max_num_step = 1000
 
     learning_rate = 1e-4
-    discount_factor = 0.95
-    reward_new_position = 0.001
+    discount_factor = 0.99
+    reward_new_position = 0.01
     reward_closer_point = 0.0 #01
 
     buffer_size = 1
@@ -29,10 +29,10 @@ def main(render_mode=None):
 
     # TODO: save run params to some file
     agnostic_method = "classic"
-    #run_id = 201; nn_id = "384"
+    run_id = 201; nn_id = "384"
     #run_id = 203; nn_id = "lstm"; memory = True
     #run_id = 205; nn_id = "3072"
-    run_id = 207; nn_id = "3072"; discount_factor = 1.
+    #run_id = 207; nn_id = "3072"; discount_factor = 1.
 
     run_train_agnostic(run_id,
                        nn_id,

@@ -5,11 +5,8 @@
 from __future__ import annotations
 
 import sys
-import numpy as np
 
 from miniworld_run_setting import run_finetune_agnostic
-from plot_functions import plot_finetune_training_curve
-from reinforce_utilities.training import initialize_training, fine_tune_agent, run_agent, train_agnostic_agent
 
 import wandb
 wandb.login()
@@ -22,21 +19,23 @@ def main(render_mode=None):
     # number of episodes for each maze
     num_episodes_fine_tune = 100
 
-    max_num_step = 100
+    max_num_step = 1000
     num_mazes = 10
 
     learning_rate = 1e-4
     discount_factor = 0.99
+    # no custom reward for finetuning
 
     buffer_size = 1
     memory = False
 
     # TODO: load run params from some file
-    # run_id = 101; agnostic_method = "maml"; nn_id = "384"
+    #run_id = 101; agnostic_method = "maml"; nn_id = "384"
     #run_id = 103; agnostic_method = "maml"; nn_id = "lstm"; memory = True
-    #run_id = 201; agnostic_method = "classic"; nn_id = "384"
+
+    run_id = 201; agnostic_method = "classic"; nn_id = "384"
     #run_id = 203; agnostic_method = "classic"; nn_id = "lstm"; memory = True
-    run_id = 205; agnostic_method = "classic"; nn_id = "3072"
+    #run_id = 205; agnostic_method = "classic"; nn_id = "3072"
 
     run_finetune_agnostic(run_id,
                           nn_id,
