@@ -30,9 +30,9 @@ def main(render_mode=None):
     memory = False
 
     #run_id = 403; agnostic_method = "classic"; nn_id = "lstm-minigrid"; memory = True
-    #run_id = 401; agnostic_method = "classic"; nn_id = None
+    run_id = 401; agnostic_method = "classic"; nn_id = None
 
-    run_id = 501; agnostic_method = "maml"; nn_id = None
+    #run_id = 501; agnostic_method = "maml"; nn_id = None
 
     run_finetune_agnostic(run_id,
                           nn_id,

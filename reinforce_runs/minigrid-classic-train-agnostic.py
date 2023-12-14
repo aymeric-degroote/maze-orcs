@@ -14,13 +14,10 @@ wandb.login()
 
 def main(render_mode=None):
 
-    use_wandb = False
+    use_wandb = False #True
 
-    num_episodes = 10000
-    num_episodes_per_maze = 100  # for MAML method
-    batch_size = 10
-    # num_batches = num_episodes // (num_episodes_per_maze * batch_size)
-    max_num_step = 300
+    num_episodes = 5000
+    max_num_step = 100
 
     learning_rate = 1e-3
     discount_factor = 0.99
@@ -29,9 +26,9 @@ def main(render_mode=None):
     buffer_size = 1
     memory = False
 
-    agnostic_method = "maml"
-    run_id = 501; nn_id = None
-    #run_id = 503; nn_id = "lstm-minigrid"; memory = True
+    agnostic_method = "classic"
+    run_id = 401; nn_id = None
+    #run_id = 403; nn_id = "lstm-minigrid"; memory = True
 
     #reload_weights = True
     reload_weights = False
@@ -40,8 +37,6 @@ def main(render_mode=None):
                        nn_id,
                        agnostic_method,
                        num_episodes=num_episodes,
-                       num_episodes_per_maze=num_episodes_per_maze,
-                       batch_size=batch_size,
                        max_num_step=max_num_step,
                        learning_rate=learning_rate,
                        discount_factor=discount_factor,
@@ -51,7 +46,6 @@ def main(render_mode=None):
                        render_mode=render_mode,
                        use_wandb=use_wandb,
                        reload_weights=reload_weights)
-
 
 
 if __name__ == "__main__":
