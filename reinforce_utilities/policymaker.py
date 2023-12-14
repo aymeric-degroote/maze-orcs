@@ -82,26 +82,57 @@ class PolicyNetwork(nn.Module):
         print("Model input size", obs_space_dims)
 
         self.maze_env = maze_env
+        self.obs_state_dims = obs_space_dims[0]
         self.hidden_state_dims = hidden_state_dims
         self.memory = memory
 
         if self.maze_env == "minigrid":
             # this is a very basic NN, check in the literature what kind of model architecture
             # they use if you want to improve it
+            self.nn_id = nn_id
 
-            if hidden_space_dims is None:
-                hidden_space_dims = [64, 32]
-            model_dims = [np.prod(obs_space_dims) * 4] + hidden_space_dims + [action_space_dims]
+            if nn_id == "lstm-minigrid":
 
-            print("model dims", model_dims)
-            layers = [nn.Flatten()]
+                # TODO: should define hidden_state_dims in function arguments
+                self.hidden_state_dims = 100
+                self.lstm_num_Layers = 1
 
-            for i in range(len(model_dims) - 1):
-                layers.append(nn.Linear(model_dims[i], model_dims[i + 1]))
-                layers.append(nn.Tanh())
+                self.lstm = nn.LSTM(input_size=self.obs_state_dims,
+                                    hidden_size=self.hidden_state_dims,
+                                    num_layers=self.lstm_num_Layers,
+                                    )
 
-            layers.append(nn.Softmax(dim=1))
-            self.net = nn.Sequential(*layers)
+                # TODO: what about concatenating hidden_state and embedded_state as input for action_net?
+                # TODO: I think we need a Deep Dense NN here. 3 layers size 64. Can't hurt.
+                dense_layer_dims = 16
+                self.action_net = nn.Sequential(
+                    nn.Linear(self.hidden_state_dims, dense_layer_dims),
+                    nn.Tanh(),
+                    nn.Linear(dense_layer_dims, dense_layer_dims),
+                    nn.Tanh(),
+                    nn.Linear(dense_layer_dims, action_space_dims),
+                    nn.Softmax(dim=1)   # TODO: check dim
+                )
+
+                if self.memory:
+                    # no batch size = 1
+                    self.hidden_state = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
+                    self.cell_output = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
+
+            else:
+                if hidden_space_dims is None:
+                    hidden_space_dims = [64, 32]
+                model_dims = [np.prod(obs_space_dims) * 4] + hidden_space_dims + [action_space_dims]
+
+                print("model dims", model_dims)
+                layers = [nn.Flatten()]
+
+                for i in range(len(model_dims) - 1):
+                    layers.append(nn.Linear(model_dims[i], model_dims[i + 1]))
+                    layers.append(nn.Tanh())
+
+                layers.append(nn.Softmax(dim=1))
+                self.net = nn.Sequential(*layers)
         else:
             # obs_space_dims is (60,80, 3)
             # action_space_dims is (3)
@@ -157,8 +188,12 @@ class PolicyNetwork(nn.Module):
                     nn.Linear(dense_layer_dims, dense_layer_dims),
                     nn.Tanh(),
                     nn.Linear(dense_layer_dims, action_space_dims),
-                    nn.Sigmoid()
+                    nn.Softmax(dim=0)  # TODO: check dim
                 )
+
+                # used to count number of parameters of each model
+                # def count_parameters(model):
+                #     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
                 if self.memory:
                     # no batch size = 1
@@ -222,7 +257,28 @@ class PolicyNetwork(nn.Module):
             action_distribution: predicted distribution of action to take
         """
         if self.maze_env == "minigrid":
-            action_distribution = self.net(state.float())
+            if self.nn_id == "lstm-minigrid":
+                batch_size, buffer_size, num_channels, height, width = state.size()
+
+                assert self.memory, NotImplementedError()
+
+                observation = state[:, 0].float()
+                x = observation.reshape(batch_size, -1, self.obs_state_dims)
+
+                # found this line on a forum. don't know why it works, but it works!
+                # I think it's making a copy basically
+                hidden = self.hidden_state.data
+                cell_input = self.cell_output.data
+
+                output, (new_hidden_state, new_cell_output) = self.lstm(x, (hidden, cell_input))
+
+                self.hidden_state = new_hidden_state
+                self.cell_output = new_cell_output
+
+                action_distribution = self.action_net(output.float())
+
+            else:
+                action_distribution = self.net(state.float())
             return action_distribution
 
         elif self.maze_env == "miniworld":
@@ -609,6 +665,7 @@ class MiniGridAgent(Agent):
 
     # override
     def policy(self, observation):
+        observation = observation.flatten()
         action = super().policy(observation)
 
         if action == 0:
