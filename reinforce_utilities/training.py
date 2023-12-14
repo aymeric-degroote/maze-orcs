@@ -4,12 +4,7 @@ import numpy as np
 import torch
 
 from reinforce_utilities.environment import MiniGridMazeEnv, MiniWorldMazeEnv
-from reinforce_utilities.policymaker import Agent, MiniGridAgent, MiniWorldAgent
-
-import gymnasium as gym
-import miniworld
-
-from utilities.wrappers import WarpFrame, PyTorchFrame
+from reinforce_utilities.policymaker import MiniGridAgent, MiniWorldAgent
 
 import wandb
 
@@ -23,6 +18,7 @@ def initialize_training(obs_space_dims,
                         learning_rate=None,
                         reward_new_position=None,
                         reward_closer_point=None,
+                        reward_new_cell=None,
                         maze_gen_algo=None,
                         buffer_size=None,
                         discount_factor=None,
@@ -53,6 +49,8 @@ def initialize_training(obs_space_dims,
                               )
         if maze_gen_algo is not None:
             env_kwargs["maze_gen_algo"] = maze_gen_algo
+        if reward_new_cell is not None:
+            env_kwargs["reward_new_cell"] = reward_new_cell
 
         env = MiniGridMazeEnv(render_mode=render_mode,
                               size=size,
@@ -303,6 +301,10 @@ def run_maml_agent(agent, env, num_episodes, max_num_step, num_episodes_per_maze
 
             agent.log_probs = []
             agent.rewards = []
+
+        # TODO: here we are computing the gradient of the loss with respect to theta_prime
+        # but actually it should be with respect to theta. that's a huge mess to evaluate
+        # see https://github.com/facebookresearch/higher/tree/main
 
         agent.set_weights(agnostic_weights)
         for weight_name, param in enumerate(agent.net.parameters()):
