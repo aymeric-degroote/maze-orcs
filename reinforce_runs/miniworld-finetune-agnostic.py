@@ -9,11 +9,11 @@ import sys
 from miniworld_run_setting import run_finetune_agnostic
 
 import wandb
+
 wandb.login()
 
 
 def main(render_mode=None):
-
     use_wandb = False
 
     # number of episodes for each maze
@@ -30,12 +30,12 @@ def main(render_mode=None):
     memory = False
 
     # TODO: load run params from some file
-    #run_id = 101; agnostic_method = "maml"; nn_id = "384"
-    #run_id = 103; agnostic_method = "maml"; nn_id = "lstm"; memory = True
+    # run_id = 101; agnostic_method = "maml"; nn_id = "384"
+    # run_id = 103; agnostic_method = "maml"; nn_id = "lstm"; memory = True
 
     run_id = 201; agnostic_method = "classic"; nn_id = "384"
-    #run_id = 203; agnostic_method = "classic"; nn_id = "lstm"; memory = True
-    #run_id = 205; agnostic_method = "classic"; nn_id = "3072"
+    # run_id = 203; agnostic_method = "classic"; nn_id = "lstm"; memory = True
+    # run_id = 205; agnostic_method = "classic"; nn_id = "3072"
 
     run_finetune_agnostic(run_id,
                           nn_id,

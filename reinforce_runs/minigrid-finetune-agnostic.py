@@ -9,11 +9,11 @@ import sys
 from minigrid_run_setting import run_finetune_agnostic
 
 import wandb
+
 wandb.login()
 
 
 def main(render_mode=None):
-
     use_wandb = False
 
     # number of episodes for each maze
@@ -24,15 +24,15 @@ def main(render_mode=None):
 
     learning_rate = 1e-3
     discount_factor = 0.99
-    reward_new_cell = 0.0 #1
+    reward_new_cell = 0.0  # 1
 
     buffer_size = 1
     memory = False
 
-    #run_id = 403; agnostic_method = "classic"; nn_id = "lstm-minigrid"; memory = True
+    # run_id = 403; agnostic_method = "classic"; nn_id = "lstm-minigrid"; memory = True
     run_id = 401; agnostic_method = "classic"; nn_id = None
 
-    #run_id = 501; agnostic_method = "maml"; nn_id = None
+    # run_id = 501; agnostic_method = "maml"; nn_id = None
 
     run_finetune_agnostic(run_id,
                           nn_id,

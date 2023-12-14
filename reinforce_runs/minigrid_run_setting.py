@@ -4,12 +4,10 @@
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 
 from plot_functions import plot_agnostic_training_curve, plot_finetune_training_curve
-from reinforce_utilities.training import initialize_training, train_agnostic_agent, run_agent, fine_tune_agent
+from reinforce_utilities.training import initialize_training, train_agnostic_agent, fine_tune_agent
 
 import wandb
 

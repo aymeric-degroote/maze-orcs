@@ -41,11 +41,11 @@ class MazeGrid:
         """
         observed_image = observation  # .get('image')[:,:,0]
         window = self.grid[self.center[0] - 6:self.center[0] + 1,
-                           self.center[1] - 3:self.center[1] + 4] * 1  # copy
+                 self.center[1] - 3:self.center[1] + 4] * 1  # copy
         new_window = np.flip(np.rot90(observed_image, 3), 1)
 
         self.grid[self.center[0] - 6:self.center[0] + 1,
-                  self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
+        self.center[1] - 3:self.center[1] + 4] = window + new_window * (window == 0)
 
     def can_move_forward(self):
         return self.grid[self.center[0] - 1, self.center[1]] == self.EMPTY
@@ -111,7 +111,7 @@ class PolicyNetwork(nn.Module):
                     nn.Linear(dense_layer_dims, dense_layer_dims),
                     nn.Tanh(),
                     nn.Linear(dense_layer_dims, action_space_dims),
-                    nn.Softmax(dim=1)   # TODO: check dim
+                    nn.Softmax(dim=1)  # TODO: check dim
                 )
 
                 if self.memory:

@@ -4,12 +4,10 @@
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 
 from plot_functions import plot_agnostic_training_curve, plot_finetune_training_curve
-from reinforce_utilities.training import initialize_training, train_agnostic_agent, run_agent, fine_tune_agent
+from reinforce_utilities.training import initialize_training, train_agnostic_agent, fine_tune_agent
 
 import wandb
 
@@ -38,7 +36,9 @@ def run_train_agnostic(run_id,
 
                        render_mode=None,
 
-                       use_wandb=True):
+                       use_wandb=True,
+
+                       reload_weights=False):
 
     run_info = f"method-{agnostic_method}_run-{run_id}"
 
@@ -51,7 +51,8 @@ def run_train_agnostic(run_id,
     load_weights_fn = None
 
     # Reinforce the model weights
-    # load_weights_fn = save_agnostic_weights_fn
+    if reload_weights:
+        load_weights_fn = save_agnostic_weights_fn
 
     agent, env = initialize_training(obs_space_dims=(60, 80, 3),
                                      action_space_dims=3,

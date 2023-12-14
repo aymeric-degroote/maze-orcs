@@ -9,11 +9,11 @@ import sys
 from miniworld_run_setting import run_train_agnostic
 
 import wandb
+
 wandb.login()
 
 
 def main(render_mode=None):
-
     use_wandb = False
 
     num_episodes = 10000
@@ -32,8 +32,8 @@ def main(render_mode=None):
 
     agnostic_method = "maml"
     run_id = 101; nn_id = "384"
-    #run_id = 103; nn_id = "lstm"; memory = True
-    #run_id = 105; nn_id = "3072"
+    # run_id = 103; nn_id = "lstm"; memory = True
+    # run_id = 105; nn_id = "3072"
 
     run_train_agnostic(run_id,
                        nn_id,
@@ -50,7 +50,6 @@ def main(render_mode=None):
                        memory=memory,
                        render_mode=render_mode,
                        use_wandb=use_wandb)
-
 
 
 if __name__ == "__main__":

@@ -9,11 +9,11 @@ import sys
 from minigrid_run_setting import run_train_agnostic
 
 import wandb
+
 wandb.login()
 
 
 def main(render_mode=None):
-
     use_wandb = False
 
     num_episodes = 5000
@@ -31,9 +31,9 @@ def main(render_mode=None):
 
     agnostic_method = "maml"
     run_id = 501; nn_id = None
-    #run_id = 503; nn_id = "lstm-minigrid"; memory = True
+    # run_id = 503; nn_id = "lstm-minigrid"; memory = True
 
-    #reload_weights = True
+    # reload_weights = True
     reload_weights = False
 
     run_train_agnostic(run_id,
@@ -51,7 +51,6 @@ def main(render_mode=None):
                        render_mode=render_mode,
                        use_wandb=use_wandb,
                        reload_weights=reload_weights)
-
 
 
 if __name__ == "__main__":

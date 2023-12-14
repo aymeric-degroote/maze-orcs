@@ -21,10 +21,7 @@ from mazelib import Maze
 from mazelib.generate.Prims import Prims
 from mazelib.generate.DungeonRooms import DungeonRooms
 
-from miniworld.miniworld import MiniWorldEnv
 from miniworld.envs.maze import Maze as MiniWorldMaze
-
-from gymnasium.utils import seeding
 
 
 class MiniGridMazeEnv(MiniGridEnv):
@@ -170,7 +167,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
                  maze_seed=None,
                  reward_new_position=0.0,
                  reward_closer_point=0.0,
-                 **kwargs,):
+                 **kwargs, ):
         if kwargs:
             print("MiniWorldMazeEnv init: unused kwargs:", kwargs)
 
@@ -243,7 +240,7 @@ class MiniWorldMazeEnv(MiniWorldMaze):
             "total_custom_reward": self.total_custom_reward,
             "agent_pos_seen": self.agent_pos_seen,
             "nb_actions": self.nb_actions,
-            "total_movements": self.total_movements, # = len(agent_pos_seen)
+            "total_movements": self.total_movements,  # = len(agent_pos_seen)
         }
 
     def reset_to_seed(self):
