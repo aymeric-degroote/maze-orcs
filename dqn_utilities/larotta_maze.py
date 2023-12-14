@@ -3,7 +3,7 @@ from gymnasium import spaces, utils
 from miniworld.entity import Box
 from miniworld.miniworld import MiniWorldEnv
 from miniworld.params import DEFAULT_PARAMS
-
+from miniworld.envs.maze import Maze as MiniWorldMaze
 
 class PedroMaze(MiniWorldEnv, utils.EzPickle):
     """
@@ -160,3 +160,92 @@ class PedroMaze(MiniWorldEnv, utils.EzPickle):
             termination = True
 
         return obs, reward, termination, truncation, info
+
+class MiniWorldMazeEnv(MiniWorldMaze):
+    def __init__(
+            self,
+            size=31,
+            num_rows=3,
+            num_cols=3,
+            room_size=2,
+            render_mode='human',  # 'top'
+            view='top',
+            max_steps: int | None = None,
+            maze_seed=None,
+            maze_type="dungeon",
+            reward_new_cell=0.0,
+            reward_closer_point=0.0,
+            **kwargs,
+    ):
+        #self.size = size
+        self.maze_type = maze_type
+        self.maze_seed = maze_seed
+
+        #self._gen_positions()
+
+        self.total_reward = 0
+        self.nb_actions = 0
+        self.agent_pos_seen = set()
+        self.reward_new_cell = reward_new_cell
+        self.best_dist = 1e8
+        self.reward_closer_point = reward_closer_point
+
+        super().__init__(#"MiniWorld-Maze-v0",
+                         num_rows=3,
+                         num_cols=3,
+                         room_size=2,
+                         render_mode='human',  # 'top'
+                         view='top')
+
+    def step(self, *args, **kwargs):
+        observation, reward, terminated, truncated, info = super().step(*args, **kwargs)
+        # TODO: separate reward and custom_reward so we can track progress more easily
+
+        custom_reward = 0
+        if tuple(self.agent.pos) not in self.agent_pos_seen:
+            custom_reward += self.reward_new_cell
+            self.agent_pos_seen.add(tuple(self.agent.pos))
+
+        if self.reward_closer_point > 0:
+            dist = np.linalg.norm(self.agent.pos - self.box.pos)
+            if dist < self.best_dist:
+                self.best_dist = dist
+                custom_reward += self.reward_closer_point
+
+        reward += custom_reward
+
+        self.nb_actions += 1
+        self.total_reward += reward
+
+        return observation, reward, terminated, truncated, info
+
+    def reset(self, maze_seed=None, *args, **kwargs):
+        if maze_seed is not None:
+            self.maze_seed = maze_seed
+
+        output = super().reset(*args, **kwargs)
+
+        # TODO: the seed has no effect here
+
+        #self._gen_positions()
+
+        self.total_reward = 0
+        self.nb_actions = 0
+
+        return output
+
+    def get_stats(self):
+        return {
+            "total_reward": self.total_reward,
+            "nb_actions": self.nb_actions
+        }
+
+    def reset_to_seed(self):
+        if self.maze_seed is not None:
+            random.seed(self.maze_seed)
+            np.random.seed(self.maze_seed)
+
+    def gen_obs(self, *args, **kwargs):
+        obs = super().render_obs(*args, **kwargs)
+
+        return obs #.get('image')[:, :, 0]

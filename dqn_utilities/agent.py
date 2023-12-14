@@ -6,6 +6,7 @@ from dqn_utilities.dqn_atari_model import DQN
 from dqn_utilities.memory import ReplayBuffer
 import torch
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class DQNAgent:
@@ -36,9 +37,11 @@ class DQNAgent:
         self.update_target_network()
         self.target_network.eval()
 
-        self.optimiser = torch.optim.RMSprop(self.policy_network.parameters()
-            , lr=lr)        
-        # self.optimiser = torch.optim.Adam(self.policy_network.parameters(), lr=lr)
+        # self.optimiser = torch.optim.RMSprop(self.policy_network.parameters()
+            # , lr=lr)        
+        
+        self.optimiser = torch.optim.Adam(self.policy_network.parameters(), lr=lr)
+        self.scheduler = ReduceLROnPlateau(self.optimiser, mode='min', patience=10,eps=1e-7)
 
         self.device = device
 

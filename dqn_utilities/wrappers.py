@@ -31,7 +31,7 @@ class PyTorchFrame(gym.ObservationWrapper):
     def __init__(self, env):
         super(PyTorchFrame, self).__init__(env)
         shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(shape[-1], shape[0], shape[1]), dtype=np.uint8)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(shape[-1], shape[0], shape[1]), dtype=np.uint8)
 
     def observation(self, observation):
         return np.rollaxis(observation, 2)
@@ -89,7 +89,7 @@ class LazyFrames(object):
         return self._frames[i]
 
 class FrameStack(gym.Wrapper):
-    def __init__(self, env, k):
+    def __init__(self, env, k=4):
         """Stack k last frames.
         Returns lazy array, which is much more memory efficient.
         Expects inputs to be of shape num_channels x height x width.
@@ -98,9 +98,9 @@ class FrameStack(gym.Wrapper):
         self.k = k
         self.frames = deque([], maxlen=k)
         shp = env.observation_space.shape
-        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0] * k, shp[1], shp[2]), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(shp[0] , shp[1], shp[2]*k), dtype=np.uint8)
 
-    def reset(self):
+    def reset(self, seed=None,options=None):
         ob, _ = self.env.reset()
         for _ in range(self.k):
             self.frames.append(ob)
@@ -113,7 +113,7 @@ class FrameStack(gym.Wrapper):
 
     def _get_ob(self):
         assert len(self.frames) == self.k
-        return LazyFrames(list(self.frames))
+        return np.concatenate(self.frames, axis=2)
 
 class BetterReward(gym.RewardWrapper):
     '''Reward on absolute distance to goal'''
@@ -124,5 +124,13 @@ class BetterReward(gym.RewardWrapper):
     def reward(self, reward):
         agent = self.env.agent
         box = self.env.box
-        bonus = 5000*reward if self.near(self.box) else 0
-        return -np.linalg.norm(box.pos - agent.pos) + bonus
+        bonus = 50 if self.near(self.box) else 0
+        return -1 + bonus
+    
+class ClipRewardEnv(gym.RewardWrapper):
+    def __init__(self, env):
+        gym.RewardWrapper.__init__(self, env)
+
+    def reward(self, reward):
+        """Bin reward to {+1, 0, -1} by its sign."""
+        return np.sign(reward)
