@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import OrderedDict
 from copy import deepcopy
 
 import numpy as np
@@ -144,108 +145,138 @@ class PolicyNetwork(nn.Module):
 
             # TODO: all the hyperparameters are arbitrary for now, needs some fine tuning
 
-            if self.nn_id == "lstm":
+            if self.nn_id == "384":
+                self.net = self.get_neural_network("384", buffer_size, output_space_dims=action_space_dims)
+
+            elif self.nn_id == "3072":
+                self.net = self.get_neural_network("3072", buffer_size, output_space_dims=action_space_dims)
+
+            elif self.nn_id == "lstm":
 
                 # TODO: should define hidden_state_dims in function arguments
                 self.hidden_state_dims = 200
-                self.embedded_state_dims = 32
+                self.embedded_state_dims = action_space_dims
                 self.lstm_num_Layers = 3
 
                 # TODO: Should we use a max_pool layer at first?
                 # TODO: Can we train embedding net separately? Use autoencoder?
-                self.embedding_net = nn.Sequential(
-                    # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3, out_channels=16,
-                              kernel_size=(6, 6), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (16, 28, 38)
-                    nn.Conv2d(in_channels=16, out_channels=32,
-                              kernel_size=(4, 4), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (64, 13, 18)
-                    nn.Conv2d(in_channels=32, out_channels=64,
-                              kernel_size=(3, 4), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (64, 6, 8)
-                    nn.Flatten(start_dim=0),
-                    # size (64*6*8) = (3072)
-                    nn.Linear(3072, 128),
-                    nn.Tanh(),
-                    nn.Linear(128, self.embedded_state_dims)
-                )
+                self.embedding_net = self.get_neural_network("384", buffer_size,
+                                                             output_space_dims=self.embedded_state_dims)
 
                 self.lstm = nn.LSTM(input_size=self.embedded_state_dims,
                                     hidden_size=self.hidden_state_dims,
                                     num_layers=self.lstm_num_Layers,
                                     )
 
-                # TODO: what about concatenating hidden_state and embedded_state as input for action_net?
-                # TODO: I think we need a Deep Dense NN here. 3 layers size 64. Can't hurt.
-                dense_layer_dims = 64
-                self.action_net = nn.Sequential(
-                    nn.Linear(self.hidden_state_dims, dense_layer_dims),
-                    nn.Tanh(),
-                    nn.Linear(dense_layer_dims, dense_layer_dims),
-                    nn.Tanh(),
-                    nn.Linear(dense_layer_dims, action_space_dims),
-                    nn.Softmax(dim=0)  # TODO: check dim
-                )
-
-                # used to count number of parameters of each model
-                # def count_parameters(model):
-                #     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+                # add linear layer at the end of lstm to reduce dimension
+                self.action_net = self.get_neural_network("action4lstm", buffer_size,
+                                                          self.hidden_state_dims, action_space_dims)
 
                 if self.memory:
                     # no batch size = 1
                     self.hidden_state = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
                     self.cell_output = torch.zeros(self.lstm_num_Layers, 1, self.hidden_state_dims)
 
-            elif self.nn_id == "3072":
-                # h' = (h-kernel)/stride + 1
-                self.net = nn.Sequential(
-                    # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
-                              kernel_size=(6, 6), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (16, 28, 38)
-                    nn.Conv2d(in_channels=16, out_channels=32,
-                              kernel_size=(4, 4), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (64, 13, 18)
-                    nn.Conv2d(in_channels=32, out_channels=64,
-                              kernel_size=(3, 4), stride=(2, 2)),
-                    nn.ReLU(),
-                    # size (64, 6, 8)
-                    nn.Flatten(start_dim=0),
-                    # size (64*6*8) = (3072)
-                    nn.Linear(3072, 128),
-                    nn.Tanh(),
-                    nn.Linear(128, 16),
-                    nn.Tanh(),
-                    nn.Linear(16, action_space_dims),
-                    nn.Softmax(dim=0)
-                )
-            elif self.nn_id == "384":
-                # h' = (h-kernel)/stride + 1
-                self.net = nn.Sequential(
-                    # size (3, 60, 80)
-                    nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
-                              kernel_size=(5, 5), stride=(5, 5)),
-                    nn.ReLU(),
-                    # size (16, 12, 16)
-                    nn.Conv2d(in_channels=16, out_channels=32,
-                              kernel_size=(4, 4), stride=(4, 4)),
-                    nn.ReLU(),
-                    # size (32, 3, 4)
-                    nn.Flatten(start_dim=0),
-                    # size (32*3*4) = (384)
-                    nn.Linear(384, 32),
-                    nn.Tanh(),
-                    nn.Linear(32, 16),
-                    nn.Tanh(),
-                    nn.Linear(16, action_space_dims),
-                    nn.Softmax(dim=0)
-                )
+            # used to count number of parameters of each model
+            # def count_parameters(model):
+            #     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    def get_neural_network(self, nn_id, buffer_size, input_state_dims=None, output_space_dims=None):
+        # TODO: all the hyperparameters are arbitrary for now, needs some fine tuning
+
+        if nn_id == "384":
+            # h' = (h-kernel)/stride + 1
+            return nn.Sequential(
+                # size (3, 60, 80)
+                nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
+                          kernel_size=(5, 5), stride=(5, 5)),
+                nn.ReLU(),
+                # size (16, 12, 16)
+                nn.Conv2d(in_channels=16, out_channels=32,
+                          kernel_size=(4, 4), stride=(4, 4)),
+                nn.ReLU(),
+                # size (32, 3, 4)
+                nn.Flatten(start_dim=0),
+                # size (32*3*4) = (384)
+                nn.Linear(384, 32),
+                nn.Tanh(),
+                nn.Linear(32, 16),
+                nn.Tanh(),
+                nn.Linear(16, output_space_dims),
+                nn.Softmax(dim=0)
+            )
+
+        elif nn_id == "3072":
+            # h' = (h-kernel)/stride + 1
+            return nn.Sequential(
+                # size (3, 60, 80)
+                nn.Conv2d(in_channels=3 * buffer_size, out_channels=16,
+                          kernel_size=(6, 6), stride=(2, 2)),
+                nn.ReLU(),
+                # size (16, 28, 38)
+                nn.Conv2d(in_channels=16, out_channels=32,
+                          kernel_size=(4, 4), stride=(2, 2)),
+                nn.ReLU(),
+                # size (64, 13, 18)
+                nn.Conv2d(in_channels=32, out_channels=64,
+                          kernel_size=(3, 4), stride=(2, 2)),
+                nn.ReLU(),
+                # size (64, 6, 8)
+                nn.Flatten(start_dim=0),
+                # size (64*6*8) = (3072)
+                nn.Linear(3072, 128),
+                nn.Tanh(),
+                nn.Linear(128, 16),
+                nn.Tanh(),
+                nn.Linear(16, output_space_dims),
+                nn.Softmax(dim=0)
+            )
+
+        elif nn_id == "emb4lstm":
+
+            return nn.Sequential(
+                # size (3, 60, 80)
+                nn.Conv2d(in_channels=3, out_channels=16,
+                          kernel_size=(6, 6), stride=(2, 2)),
+                nn.ReLU(),
+                # size (16, 28, 38)
+                nn.Conv2d(in_channels=16, out_channels=32,
+                          kernel_size=(4, 4), stride=(2, 2)),
+                nn.ReLU(),
+                # size (64, 13, 18)
+                nn.Conv2d(in_channels=32, out_channels=64,
+                          kernel_size=(3, 4), stride=(2, 2)),
+                nn.ReLU(),
+                # size (64, 6, 8)
+                nn.Flatten(start_dim=0),
+                # size (64*6*8) = (3072)
+                nn.Linear(3072, 128),
+                nn.Tanh(),
+                nn.Linear(128, output_space_dims)
+            )
+
+        elif nn_id == "lstm":
+            return nn.LSTM(input_size=self.embedded_state_dims,
+                                hidden_size=self.hidden_state_dims,
+                                num_layers=self.lstm_num_Layers,
+                                )
+
+        elif nn_id == "action4lstm":
+            # TODO: what about concatenating hidden_state and embedded_state as input for action_net?
+            # TODO: I think we need a Deep Dense NN here. 3 layers size 64. Can't hurt.
+            return nn.Sequential(
+                nn.Linear(input_state_dims, output_space_dims),
+                nn.Softmax(dim=0)  # TODO: check dim
+            )
+            # dense_layer_dims = 4
+            # return nn.Sequential(
+            #                 nn.Linear(self.hidden_state_dims, dense_layer_dims),
+            #                 nn.Tanh(),
+            #                 nn.Linear(dense_layer_dims, dense_layer_dims),
+            #                 nn.Tanh(),
+            #                 nn.Linear(dense_layer_dims, action_space_dims),
+            #                 nn.Softmax(dim=0)  # TODO: check dim
+            #             )
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         """Conditioned on the observation, returns the distribution from which an action is sampled from.
@@ -338,6 +369,17 @@ class PolicyNetwork(nn.Module):
         else:
             raise NameError("environment name missing")
 
+    def load_cnn(self):
+        fn = "weights/model_384.pth"
+        state_dict = torch.load(fn)
+        new_state_dict = OrderedDict()
+        for key in state_dict.keys():
+            if key[:4] == "net.":
+                new_state_dict[key[4:]] = state_dict[key]
+
+        self.embedding_net.load_state_dict(new_state_dict)
+        print("Loaded cnn model weights from", fn)
+
 
 class Agent:
     action_space = {0: "left",
@@ -351,6 +393,7 @@ class Agent:
                  nn_id=None, path='.',
                  learning_rate=1e-4, discount_factor=0.95, buffer_size=None,
                  memory=False,
+                 load_cnn=False,
                  **kwargs):
         if kwargs:
             print("Agent init: unused kwargs:", kwargs)
@@ -395,6 +438,8 @@ class Agent:
                                      buffer_size=buffer_size or 1,
                                      memory=memory)
 
+            if load_cnn:
+                self.load_cnn()
             if load_weights_fn:
                 self.load_weights(load_weights_fn)
 
@@ -424,12 +469,15 @@ class Agent:
         self.actions_to_do = []
 
     def save_weights(self, weights_fn):
-        fn = os.path.join(self.path, f"runs_{self.maze_env}/weights", weights_fn)
+        fn = os.path.join(self.path, f"weights", weights_fn)
         torch.save(self.net.state_dict(), fn)
         return fn
 
+    def load_cnn(self):
+        self.net.load_cnn()
+
     def load_weights(self, load_weights_fn):
-        fn = os.path.join(self.path, f"runs_{self.maze_env}/weights", load_weights_fn)
+        fn = os.path.join(self.path, f"weights", load_weights_fn)
         self.net.load_state_dict(torch.load(fn))
         print("Loaded model weights from", fn)
 

@@ -14,6 +14,7 @@ def initialize_training(obs_space_dims,
                         size=13,
                         maze_env=None,
                         load_weights_fn=None,
+                        load_cnn=False,
                         render_mode=None,
                         learning_rate=None,
                         reward_new_position=None,
@@ -60,6 +61,7 @@ def initialize_training(obs_space_dims,
                                maze_env=maze_env,
                                training=True,
                                load_weights_fn=load_weights_fn,
+                               load_cnn=load_cnn,
                                **agent_kwargs
                                )
 
@@ -158,6 +160,9 @@ def run_agent(agent, env, num_episodes, max_num_step, change_maze_at_each_episod
     stats = init_stats()
     if wandb.run is not None:
         moving_average = 0
+
+    # TODO: use number of steps instead of number of episodes...
+    #  big change but important in RL
 
     for ep_id in range(num_episodes):
         if change_maze_at_each_episode:
