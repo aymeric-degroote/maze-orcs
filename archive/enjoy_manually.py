@@ -1,15 +1,8 @@
 import numpy as np
-import gymnasium as gym
-import miniworld
-import pyglet
-from pyglet.window import key
-from pyglet import clock
-import sys
-from gymnasium import envs
-from dqn_utilities.manual_control import ManualControl
-from dqn_utilities.wrappers import WarpFrame, PyTorchFrame, MaxAndSkipEnv, FrameStack, BetterReward
+from archive.dqn_utilities import ManualControl
+from archive.dqn_utilities import WarpFrame, PyTorchFrame, FrameStack
 
-from dqn_utilities.larotta_maze import PedroMaze
+from archive.dqn_utilities import PedroMaze
 
 # ENVIRONMENT_NAME = "MiniWorld-Maze-v0" #change to whatever miniworld environment you want to manually play with
 # env = gym.make(ENVIRONMENT_NAME, 

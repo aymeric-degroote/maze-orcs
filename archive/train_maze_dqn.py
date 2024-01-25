@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from dqn_utilities.wrappers import WarpFrame, PyTorchFrame, BetterReward, MaxAndSkipEnv, FrameStack, ClipRewardEnv
-from dqn_utilities.agent import DQNAgent
+from archive.dqn_utilities import WarpFrame, PyTorchFrame, FrameStack
+from archive.dqn_utilities import DQNAgent
 # from dqn_utilities.memory import ReplayBuffer
 # from stable_baselines3.common.buffers import ReplayBuffer
 from tqdm import tqdm
-from dqn_utilities.larotta_maze import PedroMaze
-from dqn_utilities.memory import ReplayBuffer
+from archive.dqn_utilities import PedroMaze
+from archive.dqn_utilities import ReplayBuffer
 
 import torch
 import wandb

@@ -2,14 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def showPNG(grid):
-    """Generate a simple image of the maze."""
-    plt.figure(figsize=(10, 5))
-    plt.imshow(grid, cmap=plt.cm.binary, interpolation='nearest')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
-
-
 def plot_agnostic_training_curve(run_info, stats, window_plot=100, maze_env="miniworld"):
     plt.plot(stats["reward_over_episodes"])
     plt.xlabel("Episodes")

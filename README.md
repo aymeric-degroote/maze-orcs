@@ -13,6 +13,13 @@ Kunal Kundu
 Instructor: Shipra Agrawal
 
 
+TODO: CNN with action output. Feed the action in an LSTM with hidden_size = 100. Output action directly from LSTM
+-> Use transfer learning on the first CNN. We know it works. 
+-> LSTM only acts on the action: better interpretability 
+-> Can even try to freeze CNN weights (CNN agnostic to past)
+Rmk: "action" is actually "action distribution"
+
+
 To train an agnostic model using REINFORCE on MiniWorld:
 ```
 python3 reinforce_runs/miniworld-classic-train-agnostic.py

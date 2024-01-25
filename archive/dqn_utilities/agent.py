@@ -2,8 +2,8 @@
 from gymnasium import spaces
 import numpy as np
 
-from dqn_utilities.dqn_atari_model import DQN
-from dqn_utilities.memory import ReplayBuffer
+from dqn_atari_model import DQN
+from memory import ReplayBuffer
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau

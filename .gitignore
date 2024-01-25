@@ -168,3 +168,6 @@ wandb/
 *.zip
 *.npz
 events.*
+
+# python init files
+*__init__.py
